@@ -2,6 +2,7 @@ package tache
 
 import (
 	"context"
+	"runtime"
 	"sync/atomic"
 
 	"github.com/xhofe/gsync"
@@ -9,6 +10,7 @@ import (
 
 type Manager[T Task] struct {
 	tasks   gsync.MapOf[int64, T]
+	queue   gsync.QueueOf[T]
 	curID   atomic.Int64
 	workers *WorkerPool[T]
 	opts    *Options
@@ -30,25 +32,60 @@ func (m *Manager[T]) Add(task T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	task.SetCtx(ctx)
 	task.SetCancelFunc(func() {
-		task.SetStatus(CANCELING)
 		cancel()
 	})
 	task.SetID(m.curID.Add(1))
 	m.tasks.Store(task.GetID(), task)
-	m.do(task)
+	m.queue.Push(task)
+	m.next()
 }
 
-func (m *Manager[T]) do(task T) {
+func (m *Manager[T]) next() {
+	if m.queue.Len() == 0 {
+		return
+	}
+	worker := m.workers.Get()
+	if worker == nil {
+		return
+	}
+	task := m.queue.MustPop()
 	go func() {
-		task.SetStatus(PENDING)
-		select {
-		case <-task.CtxDone():
-			return
-		case worker := <-m.workers.Get():
-			worker.Run(task)
+		defer func() {
+			if m.needRetry(task) {
+				m.queue.Push(task)
+			}
 			m.workers.Put(worker)
+			m.next()
+		}()
+		if task.GetStatus() == StatusCanceling {
+			task.SetStatus(StatusCanceled)
+			task.SetErr(context.Canceled)
+			return
 		}
+		worker.Execute(task)
 	}()
+}
+
+func (m *Manager[T]) needRetry(task T) bool {
+	if sliceContains([]int{StatusErrored, StatusFailed}, task.GetStatus()) {
+		if task.GetRetry() < m.opts.Retry {
+			task.SetRetry(task.GetRetry() + 1)
+			task.SetStatus(StatusWaitingRetry)
+			return true
+		}
+	}
+	return false
+}
+
+// Wait wait all tasks done, just for test
+func (m *Manager[T]) Wait() {
+	for {
+		tasks, running := m.queue.Len(), m.workers.working.Load()
+		if tasks == 0 && running == 0 {
+			return
+		}
+		runtime.Gosched()
+	}
 }
 
 func (m *Manager[T]) Cancel(id int64) {

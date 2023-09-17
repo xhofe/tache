@@ -3,14 +3,16 @@ package tache
 import "time"
 
 type Options struct {
-	Max     int
-	Retry   int
-	Timeout *time.Duration
+	Max         int
+	Retry       int
+	Timeout     *time.Duration
+	PersistPath string
 }
 
 func DefaultOptions() *Options {
 	return &Options{
 		Max: 5,
+		//Retry: 1,
 	}
 }
 
@@ -37,5 +39,11 @@ func WithRetry(retry int) Option {
 func WithTimeout(timeout time.Duration) Option {
 	return func(o *Options) {
 		o.Timeout = &timeout
+	}
+}
+
+func WithPersistPath(path string) Option {
+	return func(o *Options) {
+		o.PersistPath = path
 	}
 }

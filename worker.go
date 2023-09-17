@@ -11,17 +11,18 @@ import (
 type Worker[T Task] struct {
 }
 
-func (w Worker[T]) Run(task T) {
+func (w Worker[T]) Execute(task T) {
 	onError := func(err error) {
 		task.SetErr(err)
 		if onFailed, ok := Task(task).(OnFailed); ok {
-			task.SetStatus(FAILING)
+			task.SetStatus(StatusFailing)
 			onFailed.OnFailed()
+			task.SetStatus(StatusFailed)
 		}
 		if errors.Is(err, context.Canceled) {
-			task.SetStatus(CANCELED)
+			task.SetStatus(StatusCanceled)
 		} else {
-			task.SetStatus(ERRORED)
+			task.SetStatus(StatusErrored)
 		}
 	}
 	defer func() {
@@ -30,34 +31,42 @@ func (w Worker[T]) Run(task T) {
 			onError(NewErr(fmt.Sprintf("panic: %v", err)))
 		}
 	}()
-	task.SetStatus(RUNNING)
-	err := task.Func()(task)
+	task.SetStatus(StatusRunning)
+	err := task.Run()
 	if err != nil {
 		onError(err)
 		return
 	}
-	task.SetStatus(SUCCEEDED)
+	task.SetStatus(StatusSucceeded)
+	task.SetErr(nil)
 }
 
 type WorkerPool[T Task] struct {
-	workers chan Worker[T]
-	working atomic.Int32
+	working atomic.Int64
+	workers chan *Worker[T]
 }
 
 func NewWorkerPool[T Task](size int) *WorkerPool[T] {
-	workers := make(chan Worker[T], size)
+	workers := make(chan *Worker[T], size)
 	for i := 0; i < size; i++ {
-		workers <- Worker[T]{}
+		workers <- &Worker[T]{}
 	}
 	return &WorkerPool[T]{
 		workers: workers,
 	}
 }
 
-func (wp *WorkerPool[T]) Get() <-chan Worker[T] {
-	return wp.workers
+func (wp *WorkerPool[T]) Get() *Worker[T] {
+	select {
+	case worker := <-wp.workers:
+		wp.working.Add(1)
+		return worker
+	default:
+		return nil
+	}
 }
 
-func (wp *WorkerPool[T]) Put(worker Worker[T]) {
+func (wp *WorkerPool[T]) Put(worker *Worker[T]) {
 	wp.workers <- worker
+	wp.working.Add(-1)
 }

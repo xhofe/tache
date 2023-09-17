@@ -9,6 +9,7 @@ type Base struct {
 	Err        error
 	Ctx        context.Context
 	CancelFunc context.CancelFunc
+	Retry      int
 }
 
 func (b *Base) SetProgress(progress float64) {
@@ -55,7 +56,16 @@ func (b *Base) SetCancelFunc(cancelFunc context.CancelFunc) {
 	b.CancelFunc = cancelFunc
 }
 
+func (b *Base) GetRetry() int {
+	return b.Retry
+}
+
+func (b *Base) SetRetry(retry int) {
+	b.Retry = retry
+}
+
 func (b *Base) Cancel() {
+	b.SetStatus(StatusCanceling)
 	b.CancelFunc()
 }
 

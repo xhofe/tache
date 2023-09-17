@@ -2,3 +2,7 @@ github.com/Xhofe/gsync v0.0.0-20230507061711-b794ced797d4 h1:agRacFnSPo9QJqzOlgt
 github.com/Xhofe/gsync v0.0.0-20230507061711-b794ced797d4/go.mod h1:4z2HkKjcFxCUCIGNAl7eTSsXHPSt9GDG5k5PALNZUPw=
 github.com/xhofe/gsync v0.0.0-20230825072748-5fbfe3142893 h1:z8z19zSHlMDf5AO60IDnMRBiBXmXGhsUXpuu+J5Rjlk=
 github.com/xhofe/gsync v0.0.0-20230825072748-5fbfe3142893/go.mod h1:fH4oNm5F9NfI5dLi0oIMtsLNKQOirUDbEMCIBb/7SU0=
+github.com/xhofe/gsync v0.0.0-20230917075641-9a8411446352 h1:ICzSr3UcOcRixmXmyhWsvLPNh1+mw34IndVRH3mLzpc=
+github.com/xhofe/gsync v0.0.0-20230917075641-9a8411446352/go.mod h1:fH4oNm5F9NfI5dLi0oIMtsLNKQOirUDbEMCIBb/7SU0=
+github.com/xhofe/gsync v0.0.0-20230917091818-2111ceb38a25 h1:eDfebW/yfq9DtG9RO3KP7BT2dot2CvJGIvrB0NEoDXI=
+github.com/xhofe/gsync v0.0.0-20230917091818-2111ceb38a25/go.mod h1:fH4oNm5F9NfI5dLi0oIMtsLNKQOirUDbEMCIBb/7SU0=
