@@ -3,7 +3,7 @@ package tache
 import "time"
 
 type Options struct {
-	Max         int
+	Works       int
 	Retry       int
 	Timeout     *time.Duration
 	PersistPath string
@@ -11,7 +11,7 @@ type Options struct {
 
 func DefaultOptions() *Options {
 	return &Options{
-		Max: 5,
+		Works: 5,
 		//Retry: 1,
 	}
 }
@@ -24,9 +24,9 @@ func WithOptions(opts Options) Option {
 	}
 }
 
-func WithMax(max int) Option {
+func WithWorks(works int) Option {
 	return func(o *Options) {
-		o.Max = max
+		o.Works = works
 	}
 }
 

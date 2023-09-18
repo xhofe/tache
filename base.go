@@ -3,13 +3,13 @@ package tache
 import "context"
 
 type Base struct {
-	Progress   float64
-	Status     int
-	ID         int64
-	Err        error
-	Ctx        context.Context
-	CancelFunc context.CancelFunc
-	Retry      int
+	Progress float64 `json:"progress"`
+	Status   Status  `json:"status"`
+	ID       int64   `json:"id"`
+	Retry    int     `json:"retry"`
+	err      error
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func (b *Base) SetProgress(progress float64) {
@@ -20,11 +20,11 @@ func (b *Base) GetProgress() float64 {
 	return b.Progress
 }
 
-func (b *Base) SetStatus(status int) {
+func (b *Base) SetStatus(status Status) {
 	b.Status = status
 }
 
-func (b *Base) GetStatus() int {
+func (b *Base) GetStatus() Status {
 	return b.Status
 }
 
@@ -37,23 +37,23 @@ func (b *Base) SetID(id int64) {
 }
 
 func (b *Base) SetErr(err error) {
-	b.Err = err
+	b.err = err
 }
 
 func (b *Base) GetErr() error {
-	return b.Err
+	return b.err
 }
 
 func (b *Base) CtxDone() <-chan struct{} {
-	return b.Ctx.Done()
+	return b.Ctx().Done()
 }
 
 func (b *Base) SetCtx(ctx context.Context) {
-	b.Ctx = ctx
+	b.ctx = ctx
 }
 
 func (b *Base) SetCancelFunc(cancelFunc context.CancelFunc) {
-	b.CancelFunc = cancelFunc
+	b.cancel = cancelFunc
 }
 
 func (b *Base) GetRetry() int {
@@ -66,7 +66,11 @@ func (b *Base) SetRetry(retry int) {
 
 func (b *Base) Cancel() {
 	b.SetStatus(StatusCanceling)
-	b.CancelFunc()
+	b.cancel()
+}
+
+func (b *Base) Ctx() context.Context {
+	return b.ctx
 }
 
 var _ TaskBase = (*Base)(nil)

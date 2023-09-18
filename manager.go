@@ -22,7 +22,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		opt(options)
 	}
 	m := &Manager[T]{
-		workers: NewWorkerPool[T](options.Max),
+		workers: NewWorkerPool[T](options.Works),
 		opts:    options,
 	}
 	return m
@@ -62,12 +62,17 @@ func (m *Manager[T]) next() {
 			task.SetErr(context.Canceled)
 			return
 		}
+		if m.opts.Timeout != nil {
+			ctx, cancel := context.WithTimeout(task.Ctx(), *m.opts.Timeout)
+			defer cancel()
+			task.SetCtx(ctx)
+		}
 		worker.Execute(task)
 	}()
 }
 
 func (m *Manager[T]) needRetry(task T) bool {
-	if sliceContains([]int{StatusErrored, StatusFailed}, task.GetStatus()) {
+	if sliceContains([]Status{StatusErrored, StatusFailed}, task.GetStatus()) {
 		if task.GetRetry() < m.opts.Retry {
 			task.SetRetry(task.GetRetry() + 1)
 			task.SetStatus(StatusWaitingRetry)
@@ -114,7 +119,7 @@ func (m *Manager[T]) GetByID(id int64) (T, bool) {
 	return m.tasks.Load(id)
 }
 
-func (m *Manager[T]) GetByStatus(status ...int) []T {
+func (m *Manager[T]) GetByStatus(status ...Status) []T {
 	var tasks []T
 	m.tasks.Range(func(key int64, value T) bool {
 		if sliceContains(status, value.GetStatus()) {
@@ -136,7 +141,7 @@ func (m *Manager[T]) RemoveAll() {
 	}
 }
 
-func (m *Manager[T]) RemoveByStatus(status ...int) {
+func (m *Manager[T]) RemoveByStatus(status ...Status) {
 	tasks := m.GetByStatus(status...)
 	for _, task := range tasks {
 		m.Remove(task.GetID())

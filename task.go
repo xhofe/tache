@@ -2,23 +2,11 @@ package tache
 
 import "context"
 
-const (
-	StatusPending = iota
-	StatusRunning
-	StatusSucceeded
-	StatusCanceling
-	StatusCanceled
-	StatusFailing
-	StatusFailed
-	StatusErrored
-	StatusWaitingRetry
-)
-
 type TaskBase interface {
 	SetProgress(progress float64)
 	GetProgress() float64
-	SetStatus(status int)
-	GetStatus() int
+	SetStatus(status Status)
+	GetStatus() Status
 	GetID() int64
 	SetID(id int64)
 	SetErr(err error)
@@ -26,6 +14,7 @@ type TaskBase interface {
 	SetCtx(ctx context.Context)
 	CtxDone() <-chan struct{}
 	Cancel()
+	Ctx() context.Context
 	SetCancelFunc(cancelFunc context.CancelFunc)
 	GetRetry() int
 	SetRetry(retry int)
