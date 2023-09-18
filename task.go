@@ -18,6 +18,8 @@ type TaskBase interface {
 	SetCancelFunc(cancelFunc context.CancelFunc)
 	GetRetry() int
 	SetRetry(retry int)
+	Persist()
+	SetPersist(persist func())
 }
 
 type Task interface {

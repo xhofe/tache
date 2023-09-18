@@ -2,6 +2,8 @@ package tache
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"runtime"
 	"sync/atomic"
 
@@ -9,11 +11,12 @@ import (
 )
 
 type Manager[T Task] struct {
-	tasks   gsync.MapOf[int64, T]
-	queue   gsync.QueueOf[T]
-	curID   atomic.Int64
-	workers *WorkerPool[T]
-	opts    *Options
+	tasks           gsync.MapOf[int64, T]
+	queue           gsync.QueueOf[T]
+	curID           atomic.Int64
+	workers         *WorkerPool[T]
+	opts            *Options
+	debouncePersist func()
 }
 
 func NewManager[T Task](opts ...Option) *Manager[T] {
@@ -25,6 +28,20 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		workers: NewWorkerPool[T](options.Works),
 		opts:    options,
 	}
+	if m.opts.PersistPath != "" {
+		m.debouncePersist = func() {
+			_ = m.persist()
+		}
+		if m.opts.PersistDebounce != nil {
+			m.debouncePersist = newDebounce(func() {
+				_ = m.persist()
+			}, *m.opts.PersistDebounce)
+		}
+		err := m.recover()
+		if err != nil {
+			// TODO: log?
+		}
+	}
 	return m
 }
 
@@ -34,9 +51,19 @@ func (m *Manager[T]) Add(task T) {
 	task.SetCancelFunc(func() {
 		cancel()
 	})
+	task.SetPersist(m.debouncePersist)
 	task.SetID(m.curID.Add(1))
+	if task.GetStatus() == StatusCanceling {
+		task.SetStatus(StatusCanceled)
+		task.SetErr(context.Canceled)
+	}
+	if task.GetStatus() == StatusFailing {
+		task.SetStatus(StatusFailed)
+	}
 	m.tasks.Store(task.GetID(), task)
-	m.queue.Push(task)
+	if !sliceContains([]Status{StatusSucceeded, StatusCanceled, StatusErrored, StatusFailed}, task.GetStatus()) {
+		m.queue.Push(task)
+	}
 	m.next()
 }
 
@@ -91,6 +118,46 @@ func (m *Manager[T]) Wait() {
 		}
 		runtime.Gosched()
 	}
+}
+
+func (m *Manager[T]) persist() error {
+	if m.opts.PersistPath == "" {
+		return nil
+	}
+	// serialize tasks
+	tasks := m.GetAll()
+	marshal, err := json.Marshal(tasks)
+	if err != nil {
+		return err
+	}
+	// write to file
+	err = os.WriteFile(m.opts.PersistPath, marshal, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Manager[T]) recover() error {
+	if m.opts.PersistPath == "" {
+		return nil
+	}
+	// read from file
+	data, err := os.ReadFile(m.opts.PersistPath)
+	if err != nil {
+		return err
+	}
+	// deserialize tasks
+	var tasks []T
+	err = json.Unmarshal(data, &tasks)
+	if err != nil {
+		return err
+	}
+	// add tasks
+	for _, task := range tasks {
+		m.Add(task)
+	}
+	return nil
 }
 
 func (m *Manager[T]) Cancel(id int64) {

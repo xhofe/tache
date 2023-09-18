@@ -8,7 +8,8 @@ import (
 
 type TestTask struct {
 	tache.Base
-	do func(*TestTask) error
+	Data string
+	do   func(*TestTask) error
 }
 
 func (t *TestTask) Run() error {
@@ -41,4 +42,17 @@ func TestWithRetry(t *testing.T) {
 	} else {
 		t.Logf("retry success, retry: %d,status: %d", task.GetRetry(), task.GetStatus())
 	}
+}
+
+func TestWithPersistPath(t *testing.T) {
+	tm := tache.NewManager[*TestTask](tache.WithPersistPath("./test.json"))
+	task := &TestTask{
+		do: func(task *TestTask) error {
+			return nil
+		},
+		Data: "haha",
+	}
+	tm.Add(task)
+	tm.Wait()
+	t.Logf("%+v", task)
 }
