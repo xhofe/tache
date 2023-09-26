@@ -27,10 +27,14 @@ type Task interface {
 	Run() error
 }
 
-type Recover interface {
-	Recover()
+type Recoverable interface {
+	Recoverable() bool
 }
 
 type OnFailed interface {
 	OnFailed()
+}
+
+type Persistable interface {
+	Persistable() bool
 }

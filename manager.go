@@ -126,7 +126,14 @@ func (m *Manager[T]) persist() error {
 	}
 	// serialize tasks
 	tasks := m.GetAll()
-	marshal, err := json.Marshal(tasks)
+	var toPersist []T
+	for _, task := range tasks {
+		// only persist task which is not persistable or persistable and need persist
+		if p, ok := Task(task).(Persistable); !ok || p.Persistable() {
+			toPersist = append(toPersist, task)
+		}
+	}
+	marshal, err := json.Marshal(toPersist)
 	if err != nil {
 		return err
 	}
@@ -155,7 +162,10 @@ func (m *Manager[T]) recover() error {
 	}
 	// add tasks
 	for _, task := range tasks {
-		m.Add(task)
+		// only recover task which is not recoverable or recoverable and need recover
+		if r, ok := Task(task).(Recoverable); !ok || r.Recoverable() {
+			m.Add(task)
+		}
 	}
 	return nil
 }

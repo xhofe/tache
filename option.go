@@ -11,9 +11,11 @@ type Options struct {
 }
 
 func DefaultOptions() *Options {
+	persistDebounce := 3 * time.Second
 	return &Options{
 		Works: 5,
 		//Retry: 1,
+		PersistDebounce: &persistDebounce,
 	}
 }
 
