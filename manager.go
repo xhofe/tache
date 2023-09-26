@@ -10,6 +10,7 @@ import (
 	"github.com/xhofe/gsync"
 )
 
+// Manager is the manager of all tasks
 type Manager[T Task] struct {
 	tasks           gsync.MapOf[int64, T]
 	queue           gsync.QueueOf[T]
@@ -19,6 +20,7 @@ type Manager[T Task] struct {
 	debouncePersist func()
 }
 
+// NewManager create a new manager
 func NewManager[T Task](opts ...Option) *Manager[T] {
 	options := DefaultOptions()
 	for _, opt := range opts {
@@ -45,6 +47,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 	return m
 }
 
+// Add a task to manager
 func (m *Manager[T]) Add(task T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	task.SetCtx(ctx)
@@ -67,6 +70,7 @@ func (m *Manager[T]) Add(task T) {
 	m.next()
 }
 
+// get next task from queue and execute it
 func (m *Manager[T]) next() {
 	if m.queue.Len() == 0 {
 		return
@@ -98,6 +102,7 @@ func (m *Manager[T]) next() {
 	}()
 }
 
+// needRetry judge whether the task need retry
 func (m *Manager[T]) needRetry(task T) bool {
 	if sliceContains([]Status{StatusErrored, StatusFailed}, task.GetStatus()) {
 		if task.GetRetry() < m.opts.Retry {
@@ -120,6 +125,7 @@ func (m *Manager[T]) Wait() {
 	}
 }
 
+// persist all tasks
 func (m *Manager[T]) persist() error {
 	if m.opts.PersistPath == "" {
 		return nil
@@ -145,6 +151,7 @@ func (m *Manager[T]) persist() error {
 	return nil
 }
 
+// recover all tasks
 func (m *Manager[T]) recover() error {
 	if m.opts.PersistPath == "" {
 		return nil
@@ -170,12 +177,14 @@ func (m *Manager[T]) recover() error {
 	return nil
 }
 
+// Cancel a task by id
 func (m *Manager[T]) Cancel(id int64) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.Cancel()
 	}
 }
 
+// CancelAll cancel all tasks
 func (m *Manager[T]) CancelAll() {
 	m.tasks.Range(func(key int64, value T) bool {
 		value.Cancel()
@@ -183,6 +192,7 @@ func (m *Manager[T]) CancelAll() {
 	})
 }
 
+// GetAll get all tasks
 func (m *Manager[T]) GetAll() []T {
 	var tasks []T
 	m.tasks.Range(func(key int64, value T) bool {
@@ -192,10 +202,12 @@ func (m *Manager[T]) GetAll() []T {
 	return tasks
 }
 
+// GetByID get task by id
 func (m *Manager[T]) GetByID(id int64) (T, bool) {
 	return m.tasks.Load(id)
 }
 
+// GetByStatus get tasks by status
 func (m *Manager[T]) GetByStatus(status ...Status) []T {
 	var tasks []T
 	m.tasks.Range(func(key int64, value T) bool {
@@ -207,10 +219,12 @@ func (m *Manager[T]) GetByStatus(status ...Status) []T {
 	return tasks
 }
 
+// Remove a task by id
 func (m *Manager[T]) Remove(id int64) {
 	m.tasks.Delete(id)
 }
 
+// RemoveAll remove all tasks
 func (m *Manager[T]) RemoveAll() {
 	tasks := m.GetAll()
 	for _, task := range tasks {
@@ -218,6 +232,7 @@ func (m *Manager[T]) RemoveAll() {
 	}
 }
 
+// RemoveByStatus remove tasks by status
 func (m *Manager[T]) RemoveByStatus(status ...Status) {
 	tasks := m.GetByStatus(status...)
 	for _, task := range tasks {

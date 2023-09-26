@@ -2,6 +2,7 @@ package tache
 
 import "context"
 
+// Base is the base struct for all tasks to implement TaskBase interface
 type Base struct {
 	Progress float64 `json:"progress"`
 	Status   Status  `json:"status"`

@@ -8,9 +8,11 @@ import (
 	"sync/atomic"
 )
 
+// Worker is the worker to execute task
 type Worker[T Task] struct {
 }
 
+// Execute executes the task
 func (w Worker[T]) Execute(task T) {
 	onError := func(err error) {
 		task.SetErr(err)
@@ -41,11 +43,13 @@ func (w Worker[T]) Execute(task T) {
 	task.SetErr(nil)
 }
 
+// WorkerPool is the pool of workers
 type WorkerPool[T Task] struct {
 	working atomic.Int64
 	workers chan *Worker[T]
 }
 
+// NewWorkerPool creates a new worker pool
 func NewWorkerPool[T Task](size int) *WorkerPool[T] {
 	workers := make(chan *Worker[T], size)
 	for i := 0; i < size; i++ {
@@ -56,6 +60,7 @@ func NewWorkerPool[T Task](size int) *WorkerPool[T] {
 	}
 }
 
+// Get gets a worker from pool
 func (wp *WorkerPool[T]) Get() *Worker[T] {
 	select {
 	case worker := <-wp.workers:
@@ -66,6 +71,7 @@ func (wp *WorkerPool[T]) Get() *Worker[T] {
 	}
 }
 
+// Put puts a worker back to pool
 func (wp *WorkerPool[T]) Put(worker *Worker[T]) {
 	wp.workers <- worker
 	wp.working.Add(-1)
