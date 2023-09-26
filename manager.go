@@ -104,6 +104,10 @@ func (m *Manager[T]) next() {
 
 // needRetry judge whether the task need retry
 func (m *Manager[T]) needRetry(task T) bool {
+	// if task is not recoverable, return false
+	if !IsRecoverable(task.GetErr()) {
+		return false
+	}
 	if sliceContains([]Status{StatusErrored, StatusFailed}, task.GetStatus()) {
 		if task.GetRetry() < m.opts.Retry {
 			task.SetRetry(task.GetRetry() + 1)
