@@ -18,6 +18,7 @@ type Manager[T Task] struct {
 	workers         *WorkerPool[T]
 	opts            *Options
 	debouncePersist func()
+	running         atomic.Bool
 }
 
 // NewManager create a new manager
@@ -30,6 +31,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		workers: NewWorkerPool[T](options.Works),
 		opts:    options,
 	}
+	m.running.Store(options.Running)
 	if m.opts.PersistPath != "" {
 		m.debouncePersist = func() {
 			_ = m.persist()
@@ -72,9 +74,15 @@ func (m *Manager[T]) Add(task T) {
 
 // get next task from queue and execute it
 func (m *Manager[T]) next() {
+	// if manager is not running, return
+	if !m.running.Load() {
+		return
+	}
+	// if queue is empty, return
 	if m.queue.Len() == 0 {
 		return
 	}
+	// if workers is full, return
 	worker := m.workers.Get()
 	if worker == nil {
 		return
@@ -242,4 +250,15 @@ func (m *Manager[T]) RemoveByStatus(status ...Status) {
 	for _, task := range tasks {
 		m.Remove(task.GetID())
 	}
+}
+
+// Start manager
+func (m *Manager[T]) Start() {
+	m.running.Store(true)
+	m.next()
+}
+
+// Pause manager
+func (m *Manager[T]) Pause() {
+	m.running.Store(false)
 }

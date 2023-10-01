@@ -9,6 +9,7 @@ type Options struct {
 	Timeout         *time.Duration
 	PersistPath     string
 	PersistDebounce *time.Duration
+	Running         bool
 }
 
 // DefaultOptions returns default options
@@ -18,6 +19,7 @@ func DefaultOptions() *Options {
 		Works: 5,
 		//Retry: 1,
 		PersistDebounce: &persistDebounce,
+		Running:         true,
 	}
 }
 
@@ -63,5 +65,12 @@ func WithPersistPath(path string) Option {
 func WithPersistDebounce(debounce time.Duration) Option {
 	return func(o *Options) {
 		o.PersistDebounce = &debounce
+	}
+}
+
+// WithRunning set running
+func WithRunning(running bool) Option {
+	return func(o *Options) {
+		o.Running = running
 	}
 }
