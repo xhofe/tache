@@ -16,7 +16,7 @@ type Base struct {
 
 func (b *Base) SetProgress(progress float64) {
 	b.Progress = progress
-	b.persist()
+	b.Persist()
 }
 
 func (b *Base) GetProgress() float64 {
@@ -25,7 +25,7 @@ func (b *Base) GetProgress() float64 {
 
 func (b *Base) SetStatus(status Status) {
 	b.Status = status
-	b.persist()
+	b.Persist()
 }
 
 func (b *Base) GetStatus() Status {
@@ -38,12 +38,12 @@ func (b *Base) GetID() int64 {
 
 func (b *Base) SetID(id int64) {
 	b.ID = id
-	b.persist()
+	b.Persist()
 }
 
 func (b *Base) SetErr(err error) {
 	b.err = err
-	b.persist()
+	b.Persist()
 }
 
 func (b *Base) GetErr() error {

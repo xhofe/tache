@@ -3,6 +3,7 @@ package tache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -184,6 +185,10 @@ func (m *Manager[T]) recover() error {
 		// only recover task which is not recoverable or recoverable and need recover
 		if r, ok := Task(task).(Recoverable); !ok || r.Recoverable() {
 			m.Add(task)
+		} else {
+			task.SetStatus(StatusFailed)
+			task.SetErr(fmt.Errorf("the task is interrupted and cannot be recovered"))
+			m.tasks.Store(task.GetID(), task)
 		}
 	}
 	return nil
@@ -193,6 +198,7 @@ func (m *Manager[T]) recover() error {
 func (m *Manager[T]) Cancel(id int64) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.Cancel()
+		m.debouncePersist()
 	}
 }
 
@@ -202,6 +208,7 @@ func (m *Manager[T]) CancelAll() {
 		value.Cancel()
 		return true
 	})
+	m.debouncePersist()
 }
 
 // GetAll get all tasks
@@ -234,6 +241,7 @@ func (m *Manager[T]) GetByStatus(status ...Status) []T {
 // Remove a task by id
 func (m *Manager[T]) Remove(id int64) {
 	m.tasks.Delete(id)
+	m.debouncePersist()
 }
 
 // RemoveAll remove all tasks

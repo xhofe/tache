@@ -46,11 +46,6 @@ type Task interface {
 	Run() error
 }
 
-// Recoverable judge whether the task is recoverable
-type Recoverable interface {
-	Recoverable() bool
-}
-
 // OnSucceeded is the interface for tasks that need to be executed when they succeed
 type OnSucceeded interface {
 	OnSucceeded()
@@ -64,4 +59,9 @@ type OnFailed interface {
 // Persistable judge whether the task is persistable
 type Persistable interface {
 	Persistable() bool
+}
+
+// Recoverable judge whether the task is recoverable
+type Recoverable interface {
+	Recoverable() bool
 }
