@@ -40,6 +40,9 @@ func (w Worker[T]) Execute(task T) {
 		return
 	}
 	task.SetStatus(StatusSucceeded)
+	if onSucceeded, ok := Task(task).(OnSucceeded); ok {
+		onSucceeded.OnSucceeded()
+	}
 	task.SetErr(nil)
 }
 
