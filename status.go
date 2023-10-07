@@ -9,9 +9,10 @@ const (
 	StatusSucceeded
 	StatusCanceling
 	StatusCanceled
-	StatusFailing
-	StatusFailed
 	StatusErrored
+	StatusFailing
+	// StatusFailed is the status of a task when it failed (no retry times left)
+	StatusFailed
 	StatusWaitingRetry
 	StatusBeforeRetry
 )

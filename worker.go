@@ -22,15 +22,19 @@ func (w Worker[T]) Execute(task T) {
 	}
 	onError := func(err error) {
 		task.SetErr(err)
-		if hook, ok := Task(task).(OnFailed); ok {
-			task.SetStatus(StatusFailing)
-			hook.OnFailed()
-			task.SetStatus(StatusFailed)
-		}
 		if errors.Is(err, context.Canceled) {
 			task.SetStatus(StatusCanceled)
 		} else {
 			task.SetStatus(StatusErrored)
+		}
+		if isLastRetry(task) {
+			if hook, ok := Task(task).(OnFailed); ok {
+				task.SetStatus(StatusFailing)
+				hook.OnFailed()
+			}
+			task.SetStatus(StatusFailed)
+		} else {
+			needRetry(task)
 		}
 	}
 	defer func() {

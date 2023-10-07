@@ -5,7 +5,7 @@ import "time"
 // Options is the options for manager
 type Options struct {
 	Works           int
-	Retry           int
+	MaxRetry        int
 	Timeout         *time.Duration
 	PersistPath     string
 	PersistDebounce *time.Duration
@@ -17,7 +17,7 @@ func DefaultOptions() *Options {
 	persistDebounce := 3 * time.Second
 	return &Options{
 		Works: 5,
-		//Retry: 1,
+		//MaxRetry: 1,
 		PersistDebounce: &persistDebounce,
 		Running:         true,
 	}
@@ -40,10 +40,10 @@ func WithWorks(works int) Option {
 	}
 }
 
-// WithRetry set retry
-func WithRetry(retry int) Option {
+// WithMaxRetry set retry
+func WithMaxRetry(maxRetry int) Option {
 	return func(o *Options) {
-		o.Retry = retry
+		o.MaxRetry = maxRetry
 	}
 }
 

@@ -54,11 +54,12 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 func (m *Manager[T]) Add(task T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	task.SetCtx(ctx)
-	task.SetCancelFunc(func() {
-		cancel()
-	})
+	task.SetCancelFunc(cancel)
 	task.SetPersist(m.debouncePersist)
 	task.SetID(m.curID.Add(1))
+	if _, maxRetry := task.GetRetry(); maxRetry == 0 {
+		task.SetRetry(0, m.opts.MaxRetry)
+	}
 	if task.GetStatus() == StatusCanceling {
 		task.SetStatus(StatusCanceled)
 		task.SetErr(context.Canceled)
@@ -79,8 +80,9 @@ func (m *Manager[T]) next() {
 	if !m.running.Load() {
 		return
 	}
-	// if queue is empty, return
-	if m.queue.Len() == 0 {
+	task, err := m.queue.Pop()
+	// if cannot get task, return
+	if err != nil {
 		return
 	}
 	// if workers is full, return
@@ -88,10 +90,9 @@ func (m *Manager[T]) next() {
 	if worker == nil {
 		return
 	}
-	task := m.queue.MustPop()
 	go func() {
 		defer func() {
-			if m.needRetry(task) {
+			if task.GetStatus() == StatusWaitingRetry {
 				m.queue.Push(task)
 			}
 			m.workers.Put(worker)
@@ -109,27 +110,6 @@ func (m *Manager[T]) next() {
 		}
 		worker.Execute(task)
 	}()
-}
-
-// needRetry judge whether the task need retry
-func (m *Manager[T]) needRetry(task T) bool {
-	// if task is not recoverable, return false
-	if !IsRecoverable(task.GetErr()) {
-		return false
-	}
-	// if task is not retryable, return false
-	if r, ok := Task(task).(Retryable); ok && !r.Retryable() {
-		return false
-	}
-	// only retry when task is errored or failed
-	if sliceContains([]Status{StatusErrored, StatusFailed}, task.GetStatus()) {
-		if task.GetRetry() < m.opts.Retry {
-			task.SetRetry(task.GetRetry() + 1)
-			task.SetStatus(StatusWaitingRetry)
-			return true
-		}
-	}
-	return false
 }
 
 // Wait wait all tasks done, just for test

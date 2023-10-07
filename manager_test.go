@@ -24,7 +24,7 @@ func TestManager_Add(t *testing.T) {
 }
 
 func TestWithRetry(t *testing.T) {
-	tm := tache.NewManager[*TestTask](tache.WithRetry(3))
+	tm := tache.NewManager[*TestTask](tache.WithMaxRetry(3))
 	var i int
 	task := &TestTask{
 		do: func(task *TestTask) error {
@@ -37,10 +37,11 @@ func TestWithRetry(t *testing.T) {
 	}
 	tm.Add(task)
 	tm.Wait()
-	if task.GetRetry() != 3 || task.GetStatus() != tache.StatusSucceeded {
-		t.Errorf("retry error, retry: %d,status: %d", task.GetRetry(), task.GetStatus())
+	retry, maxRetry := task.GetRetry()
+	if retry != 3 || task.GetStatus() != tache.StatusSucceeded {
+		t.Errorf("retry error, retry: %d, maxRetry: %d, status: %d", retry, maxRetry, task.GetStatus())
 	} else {
-		t.Logf("retry success, retry: %d,status: %d", task.GetRetry(), task.GetStatus())
+		t.Logf("retry success, retry: %d, maxRetry: %d, status: %d", retry, maxRetry, task.GetStatus())
 	}
 }
 

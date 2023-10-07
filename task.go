@@ -31,9 +31,9 @@ type TaskBase interface {
 	// SetCancelFunc sets the cancel function of the task
 	SetCancelFunc(cancelFunc context.CancelFunc)
 	// GetRetry gets the retry of the task
-	GetRetry() int
+	GetRetry() (int, int)
 	// SetRetry sets the retry of the task
-	SetRetry(retry int)
+	SetRetry(retry int, maxRetry int)
 	// Persist persists the task
 	Persist()
 	// SetPersist sets the persist function of the task

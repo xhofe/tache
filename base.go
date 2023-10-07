@@ -4,40 +4,40 @@ import "context"
 
 // Base is the base struct for all tasks to implement TaskBase interface
 type Base struct {
-	Progress float64 `json:"progress"`
-	Status   Status  `json:"status"`
-	ID       int64   `json:"id"`
-	Retry    int     `json:"retry"`
-	err      error
-	ctx      context.Context
-	cancel   context.CancelFunc
-	persist  func()
+	progress        float64
+	status          Status
+	id              int64
+	retry, maxRetry int
+	err             error
+	ctx             context.Context
+	cancel          context.CancelFunc
+	persist         func()
 }
 
 func (b *Base) SetProgress(progress float64) {
-	b.Progress = progress
+	b.progress = progress
 	b.Persist()
 }
 
 func (b *Base) GetProgress() float64 {
-	return b.Progress
+	return b.progress
 }
 
 func (b *Base) SetStatus(status Status) {
-	b.Status = status
+	b.status = status
 	b.Persist()
 }
 
 func (b *Base) GetStatus() Status {
-	return b.Status
+	return b.status
 }
 
 func (b *Base) GetID() int64 {
-	return b.ID
+	return b.id
 }
 
 func (b *Base) SetID(id int64) {
-	b.ID = id
+	b.id = id
 	b.Persist()
 }
 
@@ -62,12 +62,12 @@ func (b *Base) SetCancelFunc(cancelFunc context.CancelFunc) {
 	b.cancel = cancelFunc
 }
 
-func (b *Base) GetRetry() int {
-	return b.Retry
+func (b *Base) GetRetry() (int, int) {
+	return b.retry, b.maxRetry
 }
 
-func (b *Base) SetRetry(retry int) {
-	b.Retry = retry
+func (b *Base) SetRetry(retry int, maxRetry int) {
+	b.retry, b.maxRetry = retry, maxRetry
 }
 
 func (b *Base) Cancel() {
