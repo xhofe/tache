@@ -13,4 +13,5 @@ const (
 	StatusFailed
 	StatusErrored
 	StatusWaitingRetry
+	StatusBeforeRetry
 )

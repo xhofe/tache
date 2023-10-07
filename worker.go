@@ -14,11 +14,17 @@ type Worker[T Task] struct {
 
 // Execute executes the task
 func (w Worker[T]) Execute(task T) {
+	if isRetry(task) {
+		task.SetStatus(StatusBeforeRetry)
+		if hook, ok := Task(task).(OnBeforeRetry); ok {
+			hook.OnBeforeRetry()
+		}
+	}
 	onError := func(err error) {
 		task.SetErr(err)
-		if onFailed, ok := Task(task).(OnFailed); ok {
+		if hook, ok := Task(task).(OnFailed); ok {
 			task.SetStatus(StatusFailing)
-			onFailed.OnFailed()
+			hook.OnFailed()
 			task.SetStatus(StatusFailed)
 		}
 		if errors.Is(err, context.Canceled) {

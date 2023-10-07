@@ -37,3 +37,8 @@ func newDebounce(f func(), interval time.Duration) func() {
 		}
 	}
 }
+
+// isRetry checks if a task is retry executed
+func isRetry[T Task](task T) bool {
+	return task.GetStatus() == StatusWaitingRetry
+}
