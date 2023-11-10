@@ -27,14 +27,12 @@ func (w Worker[T]) Execute(task T) {
 		} else {
 			task.SetStatus(StatusErrored)
 		}
-		if isLastRetry(task) {
+		if !needRetry(task) {
 			if hook, ok := Task(task).(OnFailed); ok {
 				task.SetStatus(StatusFailing)
 				hook.OnFailed()
 			}
 			task.SetStatus(StatusFailed)
-		} else {
-			needRetry(task)
 		}
 	}
 	defer func() {

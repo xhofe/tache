@@ -60,7 +60,10 @@ func (m *Manager[T]) Add(task T) {
 	if _, maxRetry := task.GetRetry(); maxRetry == 0 {
 		task.SetRetry(0, m.opts.MaxRetry)
 	}
-	if task.GetStatus() == StatusCanceling {
+	if sliceContains([]Status{StatusRunning}, task.GetStatus()) {
+		task.SetStatus(StatusPending)
+	}
+	if sliceContains([]Status{StatusCanceling}, task.GetStatus()) {
 		task.SetStatus(StatusCanceled)
 		task.SetErr(context.Canceled)
 	}
@@ -242,6 +245,25 @@ func (m *Manager[T]) RemoveByStatus(status ...Status) {
 	tasks := m.GetByStatus(status...)
 	for _, task := range tasks {
 		m.Remove(task.GetID())
+	}
+}
+
+// Retry a task by id
+func (m *Manager[T]) Retry(id int64) {
+	if task, ok := m.tasks.Load(id); ok {
+		task.SetStatus(StatusWaitingRetry)
+		task.SetErr(nil)
+		task.SetRetry(0, m.opts.MaxRetry)
+		m.queue.Push(task)
+		m.debouncePersist()
+	}
+}
+
+// RetryAllFailed retry all failed tasks
+func (m *Manager[T]) RetryAllFailed() {
+	tasks := m.GetByStatus(StatusFailed)
+	for _, task := range tasks {
+		m.Retry(task.GetID())
 	}
 }
 
