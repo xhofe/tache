@@ -192,7 +192,7 @@ func (m *Manager[T]) recover() error {
 	return nil
 }
 
-// Cancel a task by id
+// Cancel a task by ID
 func (m *Manager[T]) Cancel(id string) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.Cancel()
@@ -219,7 +219,7 @@ func (m *Manager[T]) GetAll() []T {
 	return tasks
 }
 
-// GetByID get task by id
+// GetByID get task by ID
 func (m *Manager[T]) GetByID(id string) (T, bool) {
 	return m.tasks.Load(id)
 }
@@ -236,7 +236,7 @@ func (m *Manager[T]) GetByStatus(status ...Status) []T {
 	return tasks
 }
 
-// Remove a task by id
+// Remove a task by ID
 func (m *Manager[T]) Remove(id string) {
 	m.tasks.Delete(id)
 	m.debouncePersist()
@@ -258,7 +258,7 @@ func (m *Manager[T]) RemoveByStatus(status ...Status) {
 	}
 }
 
-// Retry a task by id
+// Retry a task by ID
 func (m *Manager[T]) Retry(id string) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.SetStatus(StatusWaitingRetry)

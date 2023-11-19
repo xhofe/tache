@@ -4,14 +4,16 @@ import "context"
 
 // Base is the base struct for all tasks to implement TaskBase interface
 type Base struct {
-	progress        float64
-	status          Status
-	id              string
-	retry, maxRetry int
-	err             error
-	ctx             context.Context
-	cancel          context.CancelFunc
-	persist         func()
+	ID       string `json:"id"`
+	Status   Status `json:"status"`
+	Retry    int    `json:"retry"`
+	MaxRetry int    `json:"max_retry"`
+
+	progress float64
+	err      error
+	ctx      context.Context
+	cancel   context.CancelFunc
+	persist  func()
 }
 
 func (b *Base) SetProgress(progress float64) {
@@ -24,20 +26,20 @@ func (b *Base) GetProgress() float64 {
 }
 
 func (b *Base) SetStatus(status Status) {
-	b.status = status
+	b.Status = status
 	b.Persist()
 }
 
 func (b *Base) GetStatus() Status {
-	return b.status
+	return b.Status
 }
 
 func (b *Base) GetID() string {
-	return b.id
+	return b.ID
 }
 
 func (b *Base) SetID(id string) {
-	b.id = id
+	b.ID = id
 	b.Persist()
 }
 
@@ -63,11 +65,11 @@ func (b *Base) SetCancelFunc(cancelFunc context.CancelFunc) {
 }
 
 func (b *Base) GetRetry() (int, int) {
-	return b.retry, b.maxRetry
+	return b.Retry, b.MaxRetry
 }
 
 func (b *Base) SetRetry(retry int, maxRetry int) {
-	b.retry, b.maxRetry = retry, maxRetry
+	b.Retry, b.MaxRetry = retry, maxRetry
 }
 
 func (b *Base) Cancel() {

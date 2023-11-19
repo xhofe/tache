@@ -12,9 +12,9 @@ type TaskBase interface {
 	SetStatus(status Status)
 	// GetStatus gets the status of the task
 	GetStatus() Status
-	// GetID gets the id of the task
+	// GetID gets the ID of the task
 	GetID() string
-	// SetID sets the id of the task
+	// SetID sets the ID of the task
 	SetID(id string)
 	// SetErr sets the error of the task
 	SetErr(err error)

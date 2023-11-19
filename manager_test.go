@@ -1,9 +1,9 @@
 package tache_test
 
 import (
-	"testing"
-
 	"github.com/xhofe/tache"
+	"testing"
+	"time"
 )
 
 type TestTask struct {
@@ -39,9 +39,9 @@ func TestWithRetry(t *testing.T) {
 	tm.Wait()
 	retry, maxRetry := task.GetRetry()
 	if retry != 3 || task.GetStatus() != tache.StatusSucceeded {
-		t.Errorf("retry error, retry: %d, maxRetry: %d, status: %d", retry, maxRetry, task.GetStatus())
+		t.Errorf("retry error, retry: %d, maxRetry: %d, Status: %d", retry, maxRetry, task.GetStatus())
 	} else {
-		t.Logf("retry success, retry: %d, maxRetry: %d, status: %d", retry, maxRetry, task.GetStatus())
+		t.Logf("retry success, retry: %d, maxRetry: %d, Status: %d", retry, maxRetry, task.GetStatus())
 	}
 }
 
@@ -56,4 +56,5 @@ func TestWithPersistPath(t *testing.T) {
 	tm.Add(task)
 	tm.Wait()
 	t.Logf("%+v", task)
+	time.Sleep(4 * time.Second)
 }
