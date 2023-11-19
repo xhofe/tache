@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jaevor/go-nanoid"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -13,13 +14,14 @@ import (
 
 // Manager is the manager of all tasks
 type Manager[T Task] struct {
-	tasks           gsync.MapOf[int64, T]
+	tasks           gsync.MapOf[string, T]
 	queue           gsync.QueueOf[T]
-	curID           atomic.Int64
 	workers         *WorkerPool[T]
 	opts            *Options
 	debouncePersist func()
 	running         atomic.Bool
+
+	idGenerator func() string
 }
 
 // NewManager create a new manager
@@ -28,9 +30,14 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 	for _, opt := range opts {
 		opt(options)
 	}
+	nanoID, err := nanoid.Standard(21)
+	if err != nil {
+		panic(err)
+	}
 	m := &Manager[T]{
-		workers: NewWorkerPool[T](options.Works),
-		opts:    options,
+		workers:     NewWorkerPool[T](options.Works),
+		opts:        options,
+		idGenerator: nanoID,
 	}
 	m.running.Store(options.Running)
 	if m.opts.PersistPath != "" {
@@ -56,7 +63,9 @@ func (m *Manager[T]) Add(task T) {
 	task.SetCtx(ctx)
 	task.SetCancelFunc(cancel)
 	task.SetPersist(m.debouncePersist)
-	task.SetID(m.curID.Add(1))
+	if task.GetID() == "" {
+		task.SetID(m.idGenerator())
+	}
 	if _, maxRetry := task.GetRetry(); maxRetry == 0 {
 		task.SetRetry(0, m.opts.MaxRetry)
 	}
@@ -74,6 +83,7 @@ func (m *Manager[T]) Add(task T) {
 	if !sliceContains([]Status{StatusSucceeded, StatusCanceled, StatusErrored, StatusFailed}, task.GetStatus()) {
 		m.queue.Push(task)
 	}
+	m.debouncePersist()
 	m.next()
 }
 
@@ -183,7 +193,7 @@ func (m *Manager[T]) recover() error {
 }
 
 // Cancel a task by id
-func (m *Manager[T]) Cancel(id int64) {
+func (m *Manager[T]) Cancel(id string) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.Cancel()
 		m.debouncePersist()
@@ -192,7 +202,7 @@ func (m *Manager[T]) Cancel(id int64) {
 
 // CancelAll cancel all tasks
 func (m *Manager[T]) CancelAll() {
-	m.tasks.Range(func(key int64, value T) bool {
+	m.tasks.Range(func(key string, value T) bool {
 		value.Cancel()
 		return true
 	})
@@ -202,7 +212,7 @@ func (m *Manager[T]) CancelAll() {
 // GetAll get all tasks
 func (m *Manager[T]) GetAll() []T {
 	var tasks []T
-	m.tasks.Range(func(key int64, value T) bool {
+	m.tasks.Range(func(key string, value T) bool {
 		tasks = append(tasks, value)
 		return true
 	})
@@ -210,14 +220,14 @@ func (m *Manager[T]) GetAll() []T {
 }
 
 // GetByID get task by id
-func (m *Manager[T]) GetByID(id int64) (T, bool) {
+func (m *Manager[T]) GetByID(id string) (T, bool) {
 	return m.tasks.Load(id)
 }
 
 // GetByStatus get tasks by status
 func (m *Manager[T]) GetByStatus(status ...Status) []T {
 	var tasks []T
-	m.tasks.Range(func(key int64, value T) bool {
+	m.tasks.Range(func(key string, value T) bool {
 		if sliceContains(status, value.GetStatus()) {
 			tasks = append(tasks, value)
 		}
@@ -227,7 +237,7 @@ func (m *Manager[T]) GetByStatus(status ...Status) []T {
 }
 
 // Remove a task by id
-func (m *Manager[T]) Remove(id int64) {
+func (m *Manager[T]) Remove(id string) {
 	m.tasks.Delete(id)
 	m.debouncePersist()
 }
@@ -249,7 +259,7 @@ func (m *Manager[T]) RemoveByStatus(status ...Status) {
 }
 
 // Retry a task by id
-func (m *Manager[T]) Retry(id int64) {
+func (m *Manager[T]) Retry(id string) {
 	if task, ok := m.tasks.Load(id); ok {
 		task.SetStatus(StatusWaitingRetry)
 		task.SetErr(nil)

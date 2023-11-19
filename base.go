@@ -6,7 +6,7 @@ import "context"
 type Base struct {
 	progress        float64
 	status          Status
-	id              int64
+	id              string
 	retry, maxRetry int
 	err             error
 	ctx             context.Context
@@ -32,11 +32,11 @@ func (b *Base) GetStatus() Status {
 	return b.status
 }
 
-func (b *Base) GetID() int64 {
+func (b *Base) GetID() string {
 	return b.id
 }
 
-func (b *Base) SetID(id int64) {
+func (b *Base) SetID(id string) {
 	b.id = id
 	b.Persist()
 }

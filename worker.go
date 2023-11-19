@@ -37,7 +37,7 @@ func (w Worker[T]) Execute(task T) {
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("error [%s] while run task [%d],stack trace:\n%s", err, task.GetID(), getCurrentGoroutineStack())
+			log.Printf("error [%s] while run task [%s],stack trace:\n%s", err, task.GetID(), getCurrentGoroutineStack())
 			onError(NewErr(fmt.Sprintf("panic: %v", err)))
 		}
 	}()
