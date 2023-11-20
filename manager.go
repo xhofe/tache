@@ -53,6 +53,8 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		if err != nil {
 			// TODO: log?
 		}
+	} else {
+		m.debouncePersist = func() {}
 	}
 	return m
 }
