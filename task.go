@@ -40,8 +40,18 @@ type TaskBase interface {
 	SetPersist(persist func())
 }
 
+type Info interface {
+	GetName() string
+	GetStatus() string
+}
+
 // Task is the interface for all tasks
 type Task interface {
 	TaskBase
 	Run() error
+}
+
+type TaskWithInfo interface {
+	Task
+	Info
 }
