@@ -8,10 +8,10 @@ type TaskBase interface {
 	SetProgress(progress float64)
 	// GetProgress gets the progress of the task
 	GetProgress() float64
-	// SetStatus sets the status of the task
-	SetStatus(status Status)
-	// GetStatus gets the status of the task
-	GetStatus() Status
+	// SetState sets the state of the task
+	SetState(state State)
+	// GetState gets the state of the task
+	GetState() State
 	// GetID gets the ID of the task
 	GetID() string
 	// SetID sets the ID of the task

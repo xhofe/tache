@@ -38,10 +38,10 @@ func TestWithRetry(t *testing.T) {
 	tm.Add(task)
 	tm.Wait()
 	retry, maxRetry := task.GetRetry()
-	if retry != 3 || task.GetStatus() != tache.StatusSucceeded {
-		t.Errorf("retry error, retry: %d, maxRetry: %d, Status: %d", retry, maxRetry, task.GetStatus())
+	if retry != 3 || task.GetState() != tache.StateSucceeded {
+		t.Errorf("retry error, retry: %d, maxRetry: %d, State: %d", retry, maxRetry, task.GetState())
 	} else {
-		t.Logf("retry success, retry: %d, maxRetry: %d, Status: %d", retry, maxRetry, task.GetStatus())
+		t.Logf("retry success, retry: %d, maxRetry: %d, State: %d", retry, maxRetry, task.GetState())
 	}
 }
 

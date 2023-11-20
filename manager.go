@@ -69,18 +69,18 @@ func (m *Manager[T]) Add(task T) {
 	if _, maxRetry := task.GetRetry(); maxRetry == 0 {
 		task.SetRetry(0, m.opts.MaxRetry)
 	}
-	if sliceContains([]Status{StatusRunning}, task.GetStatus()) {
-		task.SetStatus(StatusPending)
+	if sliceContains([]State{StateRunning}, task.GetState()) {
+		task.SetState(StatePending)
 	}
-	if sliceContains([]Status{StatusCanceling}, task.GetStatus()) {
-		task.SetStatus(StatusCanceled)
+	if sliceContains([]State{StateCanceling}, task.GetState()) {
+		task.SetState(StateCanceled)
 		task.SetErr(context.Canceled)
 	}
-	if task.GetStatus() == StatusFailing {
-		task.SetStatus(StatusFailed)
+	if task.GetState() == StateFailing {
+		task.SetState(StateFailed)
 	}
 	m.tasks.Store(task.GetID(), task)
-	if !sliceContains([]Status{StatusSucceeded, StatusCanceled, StatusErrored, StatusFailed}, task.GetStatus()) {
+	if !sliceContains([]State{StateSucceeded, StateCanceled, StateErrored, StateFailed}, task.GetState()) {
 		m.queue.Push(task)
 	}
 	m.debouncePersist()
@@ -105,14 +105,14 @@ func (m *Manager[T]) next() {
 	}
 	go func() {
 		defer func() {
-			if task.GetStatus() == StatusWaitingRetry {
+			if task.GetState() == StateWaitingRetry {
 				m.queue.Push(task)
 			}
 			m.workers.Put(worker)
 			m.next()
 		}()
-		if task.GetStatus() == StatusCanceling {
-			task.SetStatus(StatusCanceled)
+		if task.GetState() == StateCanceling {
+			task.SetState(StateCanceled)
 			task.SetErr(context.Canceled)
 			return
 		}
@@ -184,7 +184,7 @@ func (m *Manager[T]) recover() error {
 		if r, ok := Task(task).(Recoverable); !ok || r.Recoverable() {
 			m.Add(task)
 		} else {
-			task.SetStatus(StatusFailed)
+			task.SetState(StateFailed)
 			task.SetErr(fmt.Errorf("the task is interrupted and cannot be recovered"))
 			m.tasks.Store(task.GetID(), task)
 		}
@@ -224,11 +224,11 @@ func (m *Manager[T]) GetByID(id string) (T, bool) {
 	return m.tasks.Load(id)
 }
 
-// GetByStatus get tasks by status
-func (m *Manager[T]) GetByStatus(status ...Status) []T {
+// GetByState get tasks by state
+func (m *Manager[T]) GetByState(state ...State) []T {
 	var tasks []T
 	m.tasks.Range(func(key string, value T) bool {
-		if sliceContains(status, value.GetStatus()) {
+		if sliceContains(state, value.GetState()) {
 			tasks = append(tasks, value)
 		}
 		return true
@@ -250,9 +250,9 @@ func (m *Manager[T]) RemoveAll() {
 	}
 }
 
-// RemoveByStatus remove tasks by status
-func (m *Manager[T]) RemoveByStatus(status ...Status) {
-	tasks := m.GetByStatus(status...)
+// RemoveByState remove tasks by state
+func (m *Manager[T]) RemoveByState(state ...State) {
+	tasks := m.GetByState(state...)
 	for _, task := range tasks {
 		m.Remove(task.GetID())
 	}
@@ -261,7 +261,7 @@ func (m *Manager[T]) RemoveByStatus(status ...Status) {
 // Retry a task by ID
 func (m *Manager[T]) Retry(id string) {
 	if task, ok := m.tasks.Load(id); ok {
-		task.SetStatus(StatusWaitingRetry)
+		task.SetState(StateWaitingRetry)
 		task.SetErr(nil)
 		task.SetRetry(0, m.opts.MaxRetry)
 		m.queue.Push(task)
@@ -271,7 +271,7 @@ func (m *Manager[T]) Retry(id string) {
 
 // RetryAllFailed retry all failed tasks
 func (m *Manager[T]) RetryAllFailed() {
-	tasks := m.GetByStatus(StatusFailed)
+	tasks := m.GetByState(StateFailed)
 	for _, task := range tasks {
 		m.Retry(task.GetID())
 	}

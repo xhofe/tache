@@ -15,7 +15,7 @@ type Worker[T Task] struct {
 // Execute executes the task
 func (w Worker[T]) Execute(task T) {
 	if isRetry(task) {
-		task.SetStatus(StatusBeforeRetry)
+		task.SetState(StateBeforeRetry)
 		if hook, ok := Task(task).(OnBeforeRetry); ok {
 			hook.OnBeforeRetry()
 		}
@@ -23,16 +23,16 @@ func (w Worker[T]) Execute(task T) {
 	onError := func(err error) {
 		task.SetErr(err)
 		if errors.Is(err, context.Canceled) {
-			task.SetStatus(StatusCanceled)
+			task.SetState(StateCanceled)
 		} else {
-			task.SetStatus(StatusErrored)
+			task.SetState(StateErrored)
 		}
 		if !needRetry(task) {
 			if hook, ok := Task(task).(OnFailed); ok {
-				task.SetStatus(StatusFailing)
+				task.SetState(StateFailing)
 				hook.OnFailed()
 			}
-			task.SetStatus(StatusFailed)
+			task.SetState(StateFailed)
 		}
 	}
 	defer func() {
@@ -41,13 +41,13 @@ func (w Worker[T]) Execute(task T) {
 			onError(NewErr(fmt.Sprintf("panic: %v", err)))
 		}
 	}()
-	task.SetStatus(StatusRunning)
+	task.SetState(StateRunning)
 	err := task.Run()
 	if err != nil {
 		onError(err)
 		return
 	}
-	task.SetStatus(StatusSucceeded)
+	task.SetState(StateSucceeded)
 	if onSucceeded, ok := Task(task).(OnSucceeded); ok {
 		onSucceeded.OnSucceeded()
 	}

@@ -1,27 +1,27 @@
 package tache
 
-// Status is the status of a task
-type Status int
+// State is the state of a task
+type State int
 
 const (
-	// StatusPending is the status of a task when it is pending
-	StatusPending = iota
-	// StatusRunning is the status of a task when it is running
-	StatusRunning
-	// StatusSucceeded is the status of a task when it succeeded
-	StatusSucceeded
-	// StatusCanceling is the status of a task when it is canceling
-	StatusCanceling
-	// StatusCanceled is the status of a task when it is canceled
-	StatusCanceled
-	// StatusErrored is the status of a task when it is errored (it will be retried)
-	StatusErrored
-	// StatusFailing is the status of a task when it is failing (executed OnFailed hook)
-	StatusFailing
-	// StatusFailed is the status of a task when it failed (no retry times left)
-	StatusFailed
-	// StatusWaitingRetry is the status of a task when it is waiting for retry
-	StatusWaitingRetry
-	// StatusBeforeRetry is the status of a task when it is executing OnBeforeRetry hook
-	StatusBeforeRetry
+	// StatePending is the state of a task when it is pending
+	StatePending = iota
+	// StateRunning is the state of a task when it is running
+	StateRunning
+	// StateSucceeded is the state of a task when it succeeded
+	StateSucceeded
+	// StateCanceling is the state of a task when it is canceling
+	StateCanceling
+	// StateCanceled is the state of a task when it is canceled
+	StateCanceled
+	// StateErrored is the state of a task when it is errored (it will be retried)
+	StateErrored
+	// StateFailing is the state of a task when it is failing (executed OnFailed hook)
+	StateFailing
+	// StateFailed is the state of a task when it failed (no retry times left)
+	StateFailed
+	// StateWaitingRetry is the state of a task when it is waiting for retry
+	StateWaitingRetry
+	// StateBeforeRetry is the state of a task when it is executing OnBeforeRetry hook
+	StateBeforeRetry
 )

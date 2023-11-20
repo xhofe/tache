@@ -40,7 +40,7 @@ func newDebounce(f func(), interval time.Duration) func() {
 
 // isRetry checks if a task is retry executed
 func isRetry[T Task](task T) bool {
-	return task.GetStatus() == StatusWaitingRetry
+	return task.GetState() == StateWaitingRetry
 }
 
 // isLastRetry checks if a task is last retry
@@ -60,11 +60,11 @@ func needRetry[T Task](task T) bool {
 		return false
 	}
 	// only retry when task is errored or failed
-	if sliceContains([]Status{StatusErrored, StatusFailed}, task.GetStatus()) {
+	if sliceContains([]State{StateErrored, StateFailed}, task.GetState()) {
 		retry, maxRetry := task.GetRetry()
 		if retry < maxRetry {
 			task.SetRetry(retry+1, maxRetry)
-			task.SetStatus(StatusWaitingRetry)
+			task.SetState(StateWaitingRetry)
 			return true
 		}
 	}
