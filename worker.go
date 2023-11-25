@@ -10,6 +10,7 @@ import (
 
 // Worker is the worker to execute task
 type Worker[T Task] struct {
+	ID int
 }
 
 // Execute executes the task
@@ -64,7 +65,9 @@ type WorkerPool[T Task] struct {
 func NewWorkerPool[T Task](size int) *WorkerPool[T] {
 	workers := make(chan *Worker[T], size)
 	for i := 0; i < size; i++ {
-		workers <- &Worker[T]{}
+		workers <- &Worker[T]{
+			ID: i,
+		}
 	}
 	return &WorkerPool[T]{
 		workers: workers,

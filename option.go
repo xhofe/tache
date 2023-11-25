@@ -1,6 +1,9 @@
 package tache
 
-import "time"
+import (
+	"log/slog"
+	"time"
+)
 
 // Options is the options for manager
 type Options struct {
@@ -10,6 +13,7 @@ type Options struct {
 	PersistPath     string
 	PersistDebounce *time.Duration
 	Running         bool
+	Logger          *slog.Logger
 }
 
 // DefaultOptions returns default options
@@ -20,6 +24,7 @@ func DefaultOptions() *Options {
 		//MaxRetry: 1,
 		PersistDebounce: &persistDebounce,
 		Running:         true,
+		Logger:          slog.Default(),
 	}
 }
 
@@ -72,5 +77,12 @@ func WithPersistDebounce(debounce time.Duration) Option {
 func WithRunning(running bool) Option {
 	return func(o *Options) {
 		o.Running = running
+	}
+}
+
+// WithLogger set logger
+func WithLogger(logger *slog.Logger) Option {
+	return func(o *Options) {
+		o.Logger = logger
 	}
 }

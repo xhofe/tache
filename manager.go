@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jaevor/go-nanoid"
+	"log/slog"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -22,6 +23,7 @@ type Manager[T Task] struct {
 	running         atomic.Bool
 
 	idGenerator func() string
+	logger      *slog.Logger
 }
 
 // NewManager create a new manager
@@ -38,6 +40,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		workers:     NewWorkerPool[T](options.Works),
 		opts:        options,
 		idGenerator: nanoID,
+		logger:      options.Logger,
 	}
 	m.running.Store(options.Running)
 	if m.opts.PersistPath != "" {
@@ -51,7 +54,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		}
 		err := m.recover()
 		if err != nil {
-			// TODO: log?
+			m.logger.Error("recover error", "error", err)
 		}
 	} else {
 		m.debouncePersist = func() {}
@@ -95,16 +98,19 @@ func (m *Manager[T]) next() {
 	if !m.running.Load() {
 		return
 	}
-	task, err := m.queue.Pop()
-	// if cannot get task, return
-	if err != nil {
-		return
-	}
 	// if workers is full, return
 	worker := m.workers.Get()
 	if worker == nil {
 		return
 	}
+	m.logger.Debug("got worker", "id", worker.ID)
+	task, err := m.queue.Pop()
+	// if cannot get task, return
+	if err != nil {
+		m.workers.Put(worker)
+		return
+	}
+	m.logger.Debug("got task", "id", task.GetID())
 	go func() {
 		defer func() {
 			if task.GetState() == StateWaitingRetry {
@@ -123,6 +129,7 @@ func (m *Manager[T]) next() {
 			defer cancel()
 			task.SetCtx(ctx)
 		}
+		m.logger.Info("worker execute task", "worker", worker.ID, "task", task.GetID())
 		worker.Execute(task)
 	}()
 }

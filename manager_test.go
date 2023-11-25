@@ -2,6 +2,9 @@ package tache_test
 
 import (
 	"github.com/xhofe/tache"
+	"log/slog"
+	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,4 +60,28 @@ func TestWithPersistPath(t *testing.T) {
 	tm.Wait()
 	t.Logf("%+v", task)
 	time.Sleep(4 * time.Second)
+}
+
+func TestMultiTasks(t *testing.T) {
+	tm := tache.NewManager[*TestTask](tache.WithWorks(3), tache.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource:   true,
+		Level:       slog.LevelDebug,
+		ReplaceAttr: nil,
+	}))))
+	var num atomic.Int64
+	for i := 0; i < 100; i++ {
+		tm.Add(&TestTask{
+			do: func(task *TestTask) error {
+				num.Add(1)
+				return nil
+			},
+		})
+	}
+	tm.Wait()
+	//time.Sleep(3 * time.Second)
+	if num.Load() != 100 {
+		t.Errorf("num error, num: %d", num.Load())
+	} else {
+		t.Logf("num success, num: %d", num.Load())
+	}
 }
