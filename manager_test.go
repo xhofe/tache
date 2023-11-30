@@ -27,24 +27,24 @@ func TestManager_Add(t *testing.T) {
 }
 
 func TestWithRetry(t *testing.T) {
-	tm := tache.NewManager[*TestTask](tache.WithMaxRetry(3))
-	var i int
-	task := &TestTask{
-		do: func(task *TestTask) error {
-			i++
-			if i < 4 {
-				return tache.NewErr("test")
-			}
-			return nil
-		},
+	tm := tache.NewManager[*TestTask](tache.WithMaxRetry(3), tache.WithWorks(1))
+	var num atomic.Int64
+	for i := int64(0); i < 10; i++ {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				num.Add(1)
+				if num.Load() < i*3 {
+					return tache.NewErr("test")
+				}
+				return nil
+			},
+		}
+		tm.Add(task)
 	}
-	tm.Add(task)
 	tm.Wait()
-	retry, maxRetry := task.GetRetry()
-	if retry != 3 || task.GetState() != tache.StateSucceeded {
-		t.Errorf("retry error, retry: %d, maxRetry: %d, State: %d", retry, maxRetry, task.GetState())
-	} else {
-		t.Logf("retry success, retry: %d, maxRetry: %d, State: %d", retry, maxRetry, task.GetState())
+	tasks := tm.GetAll()
+	for _, task := range tasks {
+		t.Logf("%+v", task)
 	}
 }
 

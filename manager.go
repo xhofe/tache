@@ -274,6 +274,7 @@ func (m *Manager[T]) Retry(id string) {
 		task.SetErr(nil)
 		task.SetRetry(0, m.opts.MaxRetry)
 		m.queue.Push(task)
+		m.next()
 		m.debouncePersist()
 	}
 }
