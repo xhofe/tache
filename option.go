@@ -7,13 +7,15 @@ import (
 
 // Options is the options for manager
 type Options struct {
-	Works           int
-	MaxRetry        int
-	Timeout         *time.Duration
-	PersistPath     string
-	PersistDebounce *time.Duration
-	Running         bool
-	Logger          *slog.Logger
+	Works                int
+	MaxRetry             int
+	Timeout              *time.Duration
+	PersistPath          string
+	PersistDebounce      *time.Duration
+	Running              bool
+	Logger               *slog.Logger
+	PersistReadFunction  func() ([]byte, error)
+	PersistWriteFunction func([]byte) error
 }
 
 // DefaultOptions returns default options
@@ -63,6 +65,13 @@ func WithTimeout(timeout time.Duration) Option {
 func WithPersistPath(path string) Option {
 	return func(o *Options) {
 		o.PersistPath = path
+	}
+}
+
+func WithPersistFunction(r func() ([]byte, error), w func([]byte) error) Option {
+	return func(o *Options) {
+		o.PersistReadFunction = r
+		o.PersistWriteFunction = w
 	}
 }
 

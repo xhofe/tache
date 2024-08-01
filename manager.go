@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jaevor/go-nanoid"
 	"log/slog"
 	"os"
 	"runtime"
 	"sync/atomic"
+
+	"github.com/jaevor/go-nanoid"
 
 	"github.com/xhofe/gsync"
 )
@@ -43,7 +44,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 		logger:      options.Logger,
 	}
 	m.running.Store(options.Running)
-	if m.opts.PersistPath != "" {
+	if m.opts.PersistPath != "" || (m.opts.PersistReadFunction != nil && m.opts.PersistWriteFunction != nil) {
 		m.debouncePersist = func() {
 			_ = m.persist()
 		}
@@ -147,7 +148,7 @@ func (m *Manager[T]) Wait() {
 
 // persist all tasks
 func (m *Manager[T]) persist() error {
-	if m.opts.PersistPath == "" {
+	if m.opts.PersistPath == "" && m.opts.PersistReadFunction == nil && m.opts.PersistWriteFunction == nil {
 		return nil
 	}
 	// serialize tasks
@@ -163,21 +164,34 @@ func (m *Manager[T]) persist() error {
 	if err != nil {
 		return err
 	}
-	// write to file
-	err = os.WriteFile(m.opts.PersistPath, marshal, 0644)
-	if err != nil {
-		return err
+	if m.opts.PersistReadFunction != nil && m.opts.PersistWriteFunction != nil {
+		err = m.opts.PersistWriteFunction(marshal)
+		if err != nil {
+			return err
+		}
+	}
+	if m.opts.PersistPath != "" {
+		// write to file
+		err = os.WriteFile(m.opts.PersistPath, marshal, 0644)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // recover all tasks
 func (m *Manager[T]) recover() error {
-	if m.opts.PersistPath == "" {
+	var data []byte
+	var err error
+	if m.opts.PersistPath != "" {
+		// read from file
+		data, err = os.ReadFile(m.opts.PersistPath)
+	} else if m.opts.PersistReadFunction != nil && m.opts.PersistWriteFunction != nil {
+		data, err = m.opts.PersistReadFunction()
+	} else {
 		return nil
 	}
-	// read from file
-	data, err := os.ReadFile(m.opts.PersistPath)
 	if err != nil {
 		return err
 	}
