@@ -232,6 +232,16 @@ func (m *Manager[T]) CancelAll() {
 	m.debouncePersist()
 }
 
+// CancelByCondition cancel tasks under specific condition given by a function
+func (m *Manager[T]) CancelByCondition(condition func(task T) bool) {
+	m.tasks.Range(func(key string, value T) bool {
+		if condition(value) {
+			value.Cancel()
+		}
+		return true
+	})
+}
+
 // GetAll get all tasks
 func (m *Manager[T]) GetAll() []T {
 	var tasks []T
@@ -249,9 +259,16 @@ func (m *Manager[T]) GetByID(id string) (T, bool) {
 
 // GetByState get tasks by state
 func (m *Manager[T]) GetByState(state ...State) []T {
+	return m.GetByCondition(func(value T) bool {
+		return sliceContains(state, value.GetState())
+	})
+}
+
+// GetByCondition get tasks under specific condition given by a function
+func (m *Manager[T]) GetByCondition(condition func(task T) bool) []T {
 	var tasks []T
 	m.tasks.Range(func(key string, value T) bool {
-		if sliceContains(state, value.GetState()) {
+		if condition(value) {
 			tasks = append(tasks, value)
 		}
 		return true
@@ -276,6 +293,14 @@ func (m *Manager[T]) RemoveAll() {
 // RemoveByState remove tasks by state
 func (m *Manager[T]) RemoveByState(state ...State) {
 	tasks := m.GetByState(state...)
+	for _, task := range tasks {
+		m.Remove(task.GetID())
+	}
+}
+
+// RemoveByCondition remove tasks under specific condition given by a function
+func (m *Manager[T]) RemoveByCondition(condition func(task T) bool) {
+	tasks := m.GetByCondition(condition)
 	for _, task := range tasks {
 		m.Remove(task.GetID())
 	}
