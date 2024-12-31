@@ -137,7 +137,6 @@ func (m *Manager[T]) next() {
 
 // Wait wait all tasks done, just for test
 func (m *Manager[T]) Wait() {
-	m.workers.SetNumActive(0)
 	for {
 		tasks, running := m.queue.Len(), m.workers.working
 		if tasks == 0 && running == 0 {
