@@ -338,5 +338,9 @@ func (m *Manager[T]) Pause() {
 }
 
 func (m *Manager[T]) SetWorkersNumActive(active int64) {
+	oldActive := m.workers.numActive
 	m.workers.SetNumActive(active)
+	for i := 0; i < int(active-oldActive) && i < m.queue.Len(); i++ {
+		m.next()
+	}
 }

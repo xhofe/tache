@@ -85,3 +85,40 @@ func TestMultiTasks(t *testing.T) {
 		t.Logf("num success, num: %d", num.Load())
 	}
 }
+
+func TestSetWorkersNum(t *testing.T) {
+	tm := tache.NewManager[*TestTask](tache.WithMaxRetry(3), tache.WithWorks(20))
+	var num atomic.Int64
+	var done atomic.Int64
+	pass := make(chan interface{}, 50)
+	for i := int64(0); i < 100; i++ {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				num.Add(1)
+				_ = <-pass
+				done.Add(1)
+				return nil
+			},
+		}
+		tm.Add(task)
+	}
+	time.Sleep(time.Second)
+	if num.Load() != 20 || done.Load() != 0 {
+		t.Errorf("error, num: %d, done: %d", num.Load(), done.Load())
+	}
+	tm.SetWorkersNumActive(50)
+	time.Sleep(time.Second)
+	if num.Load() != 50 || done.Load() != 0 {
+		t.Errorf("error, num: %d, done: %d", num.Load(), done.Load())
+	}
+	tm.SetWorkersNumActive(30)
+	for i := 0; i < 30; i++ {
+		pass <- nil
+	}
+	time.Sleep(time.Second)
+	if num.Load() != 60 || done.Load() != 30 {
+		t.Errorf("error, num: %d, done: %d", num.Load(), done.Load())
+	}
+	close(pass)
+	tm.Wait()
+}
