@@ -1,11 +1,12 @@
 package tache
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
 	"log"
-	"sync/atomic"
+	"sync"
 )
 
 // Worker is the worker to execute task
@@ -57,36 +58,58 @@ func (w Worker[T]) Execute(task T) {
 
 // WorkerPool is the pool of workers
 type WorkerPool[T Task] struct {
-	working atomic.Int64
-	workers chan *Worker[T]
+	workers      *list.List
+	workersMutex sync.Mutex
+	working      int64
+	numCreated   int64
+	numActive    int64
 }
 
 // NewWorkerPool creates a new worker pool
 func NewWorkerPool[T Task](size int) *WorkerPool[T] {
-	workers := make(chan *Worker[T], size)
+	workers := list.New()
 	for i := 0; i < size; i++ {
-		workers <- &Worker[T]{
+		workers.PushBack(&Worker[T]{
 			ID: i,
-		}
+		})
 	}
 	return &WorkerPool[T]{
-		workers: workers,
+		workers:    workers,
+		numCreated: int64(size),
+		numActive:  int64(size),
 	}
 }
 
 // Get gets a worker from pool
 func (wp *WorkerPool[T]) Get() *Worker[T] {
-	select {
-	case worker := <-wp.workers:
-		wp.working.Add(1)
-		return worker
-	default:
+	wp.workersMutex.Lock()
+	defer wp.workersMutex.Unlock()
+	if wp.working >= wp.numActive {
 		return nil
 	}
+	wp.working += 1
+	if wp.workers.Len() > 0 {
+		ret := wp.workers.Front().Value.(*Worker[T])
+		wp.workers.Remove(wp.workers.Front())
+		return ret
+	}
+	ret := &Worker[T]{
+		ID: int(wp.numCreated),
+	}
+	wp.numCreated += 1
+	return ret
 }
 
 // Put puts a worker back to pool
 func (wp *WorkerPool[T]) Put(worker *Worker[T]) {
-	wp.workers <- worker
-	wp.working.Add(-1)
+	wp.workersMutex.Lock()
+	defer wp.workersMutex.Unlock()
+	wp.workers.PushBack(worker)
+	wp.working -= 1
+}
+
+func (wp *WorkerPool[T]) SetNumActive(active int64) {
+	wp.workersMutex.Lock()
+	defer wp.workersMutex.Unlock()
+	wp.numActive = active
 }
