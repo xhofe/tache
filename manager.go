@@ -9,8 +9,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	"github.com/jaevor/go-nanoid"
-
+	nanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/xhofe/gsync"
 )
 
@@ -33,15 +32,14 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 	for _, opt := range opts {
 		opt(options)
 	}
-	nanoID, err := nanoid.Standard(21)
-	if err != nil {
-		panic(err)
-	}
+
 	m := &Manager[T]{
-		workers:     NewWorkerPool[T](options.Works),
-		opts:        options,
-		idGenerator: nanoID,
-		logger:      options.Logger,
+		workers: NewWorkerPool[T](options.Works),
+		opts:    options,
+		idGenerator: func() string {
+			return nanoid.Must()
+		},
+		logger: options.Logger,
 	}
 	m.running.Store(options.Running)
 	if m.opts.PersistPath != "" || (m.opts.PersistReadFunction != nil && m.opts.PersistWriteFunction != nil) {
