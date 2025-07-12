@@ -1,12 +1,14 @@
 package tache_test
 
 import (
-	"github.com/xhofe/tache"
 	"log/slog"
 	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/xhofe/tache"
 )
 
 type TestTask struct {
@@ -121,4 +123,131 @@ func TestSetWorkersNum(t *testing.T) {
 	}
 	close(pass)
 	tm.Wait()
+}
+
+func TestTaskWait(t *testing.T) {
+	tm := tache.NewManager[*TestTask](tache.WithWorks(1))
+
+	// Test case 1: Wait for successful completion
+	t.Run("WaitForSuccess", func(t *testing.T) {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				time.Sleep(100 * time.Millisecond) // Simulate work
+				return nil
+			},
+		}
+		tm.Add(task)
+
+		// Wait should block until task completes
+		start := time.Now()
+		task.Wait()
+		elapsed := time.Since(start)
+
+		if elapsed < 100*time.Millisecond {
+			t.Errorf("Wait returned too quickly, expected >= 100ms, got %v", elapsed)
+		}
+
+		if task.GetState() != tache.StateSucceeded {
+			t.Errorf("Expected StateSucceeded, got %v", task.GetState())
+		}
+
+		// Wait should return immediately on subsequent calls
+		start = time.Now()
+		task.Wait()
+		elapsed = time.Since(start)
+
+		if elapsed > 10*time.Millisecond {
+			t.Errorf("Second Wait call should return immediately, got %v", elapsed)
+		}
+	})
+
+	// Test case 2: Wait for failed task
+	t.Run("WaitForFailure", func(t *testing.T) {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				time.Sleep(50 * time.Millisecond)
+				return tache.NewErr("test error")
+			},
+		}
+		tm.Add(task)
+
+		start := time.Now()
+		task.Wait()
+		elapsed := time.Since(start)
+
+		if elapsed < 50*time.Millisecond {
+			t.Errorf("Wait returned too quickly, expected >= 50ms, got %v", elapsed)
+		}
+
+		if task.GetState() != tache.StateFailed {
+			t.Errorf("Expected StateFailed, got %v", task.GetState())
+		}
+	})
+
+	// Test case 3: Wait for cancelled task
+	t.Run("WaitForCancelled", func(t *testing.T) {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				select {
+				case <-task.CtxDone():
+					return task.Ctx().Err()
+				case <-time.After(200 * time.Millisecond):
+					return nil
+				}
+			},
+		}
+		tm.Add(task)
+
+		// Cancel the task after a short delay
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			task.Cancel()
+		}()
+
+		start := time.Now()
+		task.Wait()
+		elapsed := time.Since(start)
+
+		if elapsed < 50*time.Millisecond {
+			t.Errorf("Wait returned too quickly, expected >= 50ms, got %v", elapsed)
+		}
+
+		if task.GetState() != tache.StateCanceled {
+			t.Errorf("Expected StateCanceled, got %v", task.GetState())
+		}
+	})
+
+	// Test case 4: Multiple goroutines waiting
+	t.Run("MultipleWaiters", func(t *testing.T) {
+		task := &TestTask{
+			do: func(task *TestTask) error {
+				time.Sleep(100 * time.Millisecond)
+				return nil
+			},
+		}
+		tm.Add(task)
+
+		var wg sync.WaitGroup
+		completedCount := atomic.Int64{}
+
+		// Start multiple goroutines that wait for the task
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				task.Wait()
+				completedCount.Add(1)
+			}()
+		}
+
+		wg.Wait()
+
+		if completedCount.Load() != 5 {
+			t.Errorf("Expected 5 waiters to complete, got %d", completedCount.Load())
+		}
+
+		if task.GetState() != tache.StateSucceeded {
+			t.Errorf("Expected StateSucceeded, got %v", task.GetState())
+		}
+	})
 }

@@ -58,6 +58,8 @@ type TaskBase interface {
 	SetManager(manager IManager)
 	// GetSelf gets the self task of the current task
 	GetSelf() Task
+	// Wait waits for the task to complete, can be called multiple times
+	Wait()
 }
 
 type NamedTask interface {

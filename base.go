@@ -22,6 +22,8 @@ type Base struct {
 	parent     Task               `json:"-"`
 	subtasksMu sync.RWMutex       `json:"-"`
 	manager    IManager           `json:"-"`
+	done       *sync.Cond         `json:"-"`
+	doneOnce   sync.Once          `json:"-"`
 }
 
 func (b *Base) SetProgress(progress float64) {
@@ -36,6 +38,39 @@ func (b *Base) GetProgress() float64 {
 func (b *Base) SetState(state State) {
 	b.State = state
 	b.Persist()
+
+	// Check if task is finished and notify waiters
+	if b.isFinished() {
+		b.ensureDone()
+		b.done.Broadcast()
+	}
+}
+
+// isFinished checks if the task is in a finished state
+func (b *Base) isFinished() bool {
+	finishedStates := []State{StateSucceeded, StateCanceled, StateFailed}
+	return sliceContains(finishedStates, b.State)
+}
+
+// ensureDone initializes the done condition variable if it hasn't been initialized
+func (b *Base) ensureDone() {
+	b.doneOnce.Do(func() {
+		if b.done == nil {
+			b.done = sync.NewCond(&sync.Mutex{})
+		}
+	})
+}
+
+// Wait waits for the task to complete, can be called multiple times
+func (b *Base) Wait() {
+	b.ensureDone()
+
+	b.done.L.Lock()
+	defer b.done.L.Unlock()
+
+	for !b.isFinished() {
+		b.done.Wait()
+	}
 }
 
 func (b *Base) GetState() State {

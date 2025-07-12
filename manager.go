@@ -424,8 +424,8 @@ func (m *Manager[T]) GetByIDAll(id string) Task {
 	return nil
 }
 
-// TaskTree represents a task in tree structure
-type TaskTree struct {
-	Task     Task        `json:"task"`
-	Subtasks []*TaskTree `json:"subtasks"`
+// WaitByID waits for a task by ID to complete
+func (m *Manager[T]) WaitByID(id string) {
+	task := m.GetByIDAll(id)
+	task.Wait()
 }
