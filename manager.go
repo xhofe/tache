@@ -15,9 +15,10 @@ import (
 
 // Manager is the manager of all tasks
 type Manager[T Task] struct {
-	tasks           gsync.MapOf[string, T]
-	queue           gsync.QueueOf[T]
-	workers         *WorkerPool[T]
+	rootTasks       gsync.MapOf[string, T]
+	subtasks        gsync.MapOf[string, Task]
+	toRunTaskQueue  gsync.QueueOf[T]
+	workers         *WorkerPool
 	opts            *Options
 	debouncePersist func()
 	running         atomic.Bool
@@ -34,7 +35,7 @@ func NewManager[T Task](opts ...Option) *Manager[T] {
 	}
 
 	m := &Manager[T]{
-		workers: NewWorkerPool[T](options.Works),
+		workers: NewWorkerPool(options.Works),
 		opts:    options,
 		idGenerator: func() string {
 			return nanoid.Must()
@@ -67,8 +68,9 @@ func (m *Manager[T]) Add(task T) {
 	task.SetCtx(ctx)
 	task.SetCancelFunc(cancel)
 	task.SetPersist(m.debouncePersist)
+	task.SetManager(m)
 	if task.GetID() == "" {
-		task.SetID(m.idGenerator())
+		task.SetID(m.GenerateID())
 	}
 	if _, maxRetry := task.GetRetry(); maxRetry == 0 {
 		task.SetRetry(0, m.opts.MaxRetry)
@@ -83,10 +85,14 @@ func (m *Manager[T]) Add(task T) {
 	if task.GetState() == StateFailing {
 		task.SetState(StateFailed)
 	}
-	m.tasks.Store(task.GetID(), task)
-	if !sliceContains([]State{StateSucceeded, StateCanceled, StateErrored, StateFailed}, task.GetState()) {
-		m.queue.Push(task)
+	m.rootTasks.Store(task.GetID(), task)
+
+	// Only add root tasks (tasks without parents) to the queue
+	// Subtasks should be managed by their parent tasks
+	if task.GetParent() == nil && !sliceContains([]State{StateSucceeded, StateCanceled, StateErrored, StateFailed}, task.GetState()) {
+		m.toRunTaskQueue.Push(task)
 	}
+
 	m.debouncePersist()
 	m.next()
 }
@@ -102,18 +108,18 @@ func (m *Manager[T]) next() {
 	if worker == nil {
 		return
 	}
-	m.logger.Debug("got worker", "id", worker.ID)
-	task, err := m.queue.Pop()
+	m.logger.Debug("got worker", slog.Int("id", worker.ID))
+	task, err := m.toRunTaskQueue.Pop()
 	// if cannot get task, return
 	if err != nil {
 		m.workers.Put(worker)
 		return
 	}
-	m.logger.Debug("got task", "id", task.GetID())
+	m.logger.Debug("got task", slog.String("id", task.GetID()))
 	go func() {
 		defer func() {
 			if task.GetState() == StateWaitingRetry {
-				m.queue.Push(task)
+				m.toRunTaskQueue.Push(task)
 			}
 			m.workers.Put(worker)
 			m.next()
@@ -128,7 +134,7 @@ func (m *Manager[T]) next() {
 			defer cancel()
 			task.SetCtx(ctx)
 		}
-		m.logger.Info("worker execute task", "worker", worker.ID, "task", task.GetID())
+		m.logger.Info("worker execute task", slog.Int("worker", worker.ID), slog.String("task", task.GetID()))
 		worker.Execute(task)
 	}()
 }
@@ -136,7 +142,7 @@ func (m *Manager[T]) next() {
 // Wait wait all tasks done, just for test
 func (m *Manager[T]) Wait() {
 	for {
-		tasks, running := m.queue.Len(), m.workers.working
+		tasks, running := m.toRunTaskQueue.Len(), m.workers.working
 		if tasks == 0 && running == 0 {
 			return
 		}
@@ -207,7 +213,7 @@ func (m *Manager[T]) recover() error {
 		} else {
 			task.SetState(StateFailed)
 			task.SetErr(fmt.Errorf("the task is interrupted and cannot be recovered"))
-			m.tasks.Store(task.GetID(), task)
+			m.rootTasks.Store(task.GetID(), task)
 		}
 	}
 	return nil
@@ -215,15 +221,26 @@ func (m *Manager[T]) recover() error {
 
 // Cancel a task by ID
 func (m *Manager[T]) Cancel(id string) {
-	if task, ok := m.tasks.Load(id); ok {
-		task.Cancel()
-		m.debouncePersist()
-	}
+	task := m.GetByIDAll(id)
+	m.cancelTaskAndSubtasks(task)
+	m.debouncePersist()
 }
 
-// CancelAll cancel all tasks
+// cancelTaskAndSubtasks cancels a task and all its subtasks recursively
+func (m *Manager[T]) cancelTaskAndSubtasks(task Task) {
+	task.Cancel()
+
+	// Cancel all subtasks,need? the context of subtasks will be canceled by the parent task
+	// subtasks := task.GetSubtasks()
+	// for _, subtask := range subtasks {
+	// 	m.cancelTaskAndSubtasks(subtask)
+	// }
+}
+
+// CancelAll cancel all tasks, just cancel all root tasks is enough
+// because all subtasks will be canceled by their parent tasks
 func (m *Manager[T]) CancelAll() {
-	m.tasks.Range(func(key string, value T) bool {
+	m.rootTasks.Range(func(key string, value T) bool {
 		value.Cancel()
 		return true
 	})
@@ -232,7 +249,7 @@ func (m *Manager[T]) CancelAll() {
 
 // CancelByCondition cancel tasks under specific condition given by a function
 func (m *Manager[T]) CancelByCondition(condition func(task T) bool) {
-	m.tasks.Range(func(key string, value T) bool {
+	m.rootTasks.Range(func(key string, value T) bool {
 		if condition(value) {
 			value.Cancel()
 		}
@@ -240,10 +257,16 @@ func (m *Manager[T]) CancelByCondition(condition func(task T) bool) {
 	})
 }
 
+// deprecated: use GetRootTasks instead
 // GetAll get all tasks
 func (m *Manager[T]) GetAll() []T {
+	return m.GetRootTasks()
+}
+
+// GetRootTasks gets all root tasks (tasks without parents)
+func (m *Manager[T]) GetRootTasks() []T {
 	var tasks []T
-	m.tasks.Range(func(key string, value T) bool {
+	m.rootTasks.Range(func(key string, value T) bool {
 		tasks = append(tasks, value)
 		return true
 	})
@@ -252,7 +275,7 @@ func (m *Manager[T]) GetAll() []T {
 
 // GetByID get task by ID
 func (m *Manager[T]) GetByID(id string) (T, bool) {
-	return m.tasks.Load(id)
+	return m.rootTasks.Load(id)
 }
 
 // GetByState get tasks by state
@@ -265,7 +288,7 @@ func (m *Manager[T]) GetByState(state ...State) []T {
 // GetByCondition get tasks under specific condition given by a function
 func (m *Manager[T]) GetByCondition(condition func(task T) bool) []T {
 	var tasks []T
-	m.tasks.Range(func(key string, value T) bool {
+	m.rootTasks.Range(func(key string, value T) bool {
 		if condition(value) {
 			tasks = append(tasks, value)
 		}
@@ -276,7 +299,7 @@ func (m *Manager[T]) GetByCondition(condition func(task T) bool) []T {
 
 // Remove a task by ID
 func (m *Manager[T]) Remove(id string) {
-	m.tasks.Delete(id)
+	m.rootTasks.Delete(id)
 	m.debouncePersist()
 }
 
@@ -306,11 +329,11 @@ func (m *Manager[T]) RemoveByCondition(condition func(task T) bool) {
 
 // Retry a task by ID
 func (m *Manager[T]) Retry(id string) {
-	if task, ok := m.tasks.Load(id); ok {
+	if task, ok := m.rootTasks.Load(id); ok {
 		task.SetState(StateWaitingRetry)
 		task.SetErr(nil)
 		task.SetRetry(0, m.opts.MaxRetry)
-		m.queue.Push(task)
+		m.toRunTaskQueue.Push(task)
 		m.next()
 		m.debouncePersist()
 	}
@@ -338,7 +361,71 @@ func (m *Manager[T]) Pause() {
 func (m *Manager[T]) SetWorkersNumActive(active int64) {
 	oldActive := m.workers.numActive
 	m.workers.SetNumActive(active)
-	for i := 0; i < int(active-oldActive) && i < m.queue.Len(); i++ {
+	for i := 0; i < int(active-oldActive) && i < m.toRunTaskQueue.Len(); i++ {
 		m.next()
 	}
+}
+
+// GetTaskTrees gets all tasks in tree structure
+func (m *Manager[T]) GetTaskTrees() []*TaskTree {
+	rootTasks := m.GetRootTasks()
+	trees := make([]*TaskTree, len(rootTasks))
+
+	for i, rootTask := range rootTasks {
+		trees[i] = m.buildTaskTree(rootTask)
+	}
+
+	return trees
+}
+
+// GetTreeByID gets the task tree by root task ID
+func (m *Manager[T]) GetTreeByID(id string) *TaskTree {
+	task := m.GetByIDAll(id)
+	if task == nil {
+		return nil
+	}
+	return m.buildTaskTree(task)
+}
+
+// buildTaskTree builds a task tree from a root task
+func (m *Manager[T]) buildTaskTree(root Task) *TaskTree {
+	tree := &TaskTree{
+		Task:     root,
+		Subtasks: make([]*TaskTree, 0),
+	}
+
+	subtasks := root.GetSubtasks()
+	for _, subtask := range subtasks {
+		childTree := m.buildTaskTree(subtask)
+		tree.Subtasks = append(tree.Subtasks, childTree)
+	}
+
+	return tree
+}
+
+func (m *Manager[T]) GenerateID() string {
+	return m.idGenerator()
+}
+
+func (m *Manager[T]) SaveSubTask(subtask Task) {
+	m.subtasks.Store(subtask.GetID(), subtask)
+}
+
+// GetByIDAll gets the task by ID, including subtasks
+func (m *Manager[T]) GetByIDAll(id string) Task {
+	task, ok := m.rootTasks.Load(id)
+	if ok {
+		return task
+	}
+	subtask, ok := m.subtasks.Load(id)
+	if ok {
+		return subtask
+	}
+	return nil
+}
+
+// TaskTree represents a task in tree structure
+type TaskTree struct {
+	Task     Task        `json:"task"`
+	Subtasks []*TaskTree `json:"subtasks"`
 }

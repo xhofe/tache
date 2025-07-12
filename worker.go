@@ -10,12 +10,13 @@ import (
 )
 
 // Worker is the worker to execute task
-type Worker[T Task] struct {
+type Worker struct {
 	ID int
 }
 
 // Execute executes the task
-func (w Worker[T]) Execute(task T) {
+func (w Worker) Execute(task Task) {
+	task.SetWorker(&w)
 	if isRetry(task) {
 		task.SetState(StateBeforeRetry)
 		if hook, ok := Task(task).(OnBeforeRetry); ok {
@@ -57,7 +58,7 @@ func (w Worker[T]) Execute(task T) {
 }
 
 // WorkerPool is the pool of workers
-type WorkerPool[T Task] struct {
+type WorkerPool struct {
 	workers      *list.List
 	workersMutex sync.Mutex
 	working      int64
@@ -66,14 +67,14 @@ type WorkerPool[T Task] struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool[T Task](size int) *WorkerPool[T] {
+func NewWorkerPool(size int) *WorkerPool {
 	workers := list.New()
 	for i := 0; i < size; i++ {
-		workers.PushBack(&Worker[T]{
+		workers.PushBack(&Worker{
 			ID: i,
 		})
 	}
-	return &WorkerPool[T]{
+	return &WorkerPool{
 		workers:    workers,
 		numCreated: int64(size),
 		numActive:  int64(size),
@@ -81,7 +82,7 @@ func NewWorkerPool[T Task](size int) *WorkerPool[T] {
 }
 
 // Get gets a worker from pool
-func (wp *WorkerPool[T]) Get() *Worker[T] {
+func (wp *WorkerPool) Get() *Worker {
 	wp.workersMutex.Lock()
 	defer wp.workersMutex.Unlock()
 	if wp.working >= wp.numActive {
@@ -89,11 +90,11 @@ func (wp *WorkerPool[T]) Get() *Worker[T] {
 	}
 	wp.working += 1
 	if wp.workers.Len() > 0 {
-		ret := wp.workers.Front().Value.(*Worker[T])
+		ret := wp.workers.Front().Value.(*Worker)
 		wp.workers.Remove(wp.workers.Front())
 		return ret
 	}
-	ret := &Worker[T]{
+	ret := &Worker{
 		ID: int(wp.numCreated),
 	}
 	wp.numCreated += 1
@@ -101,14 +102,14 @@ func (wp *WorkerPool[T]) Get() *Worker[T] {
 }
 
 // Put puts a worker back to pool
-func (wp *WorkerPool[T]) Put(worker *Worker[T]) {
+func (wp *WorkerPool) Put(worker *Worker) {
 	wp.workersMutex.Lock()
 	defer wp.workersMutex.Unlock()
 	wp.workers.PushBack(worker)
 	wp.working -= 1
 }
 
-func (wp *WorkerPool[T]) SetNumActive(active int64) {
+func (wp *WorkerPool) SetNumActive(active int64) {
 	wp.workersMutex.Lock()
 	defer wp.workersMutex.Unlock()
 	wp.numActive = active

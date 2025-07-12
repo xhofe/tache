@@ -38,11 +38,39 @@ type TaskBase interface {
 	Persist()
 	// SetPersist sets the persist function of the task
 	SetPersist(persist func())
+	// SetWorker sets the worker of the task
+	SetWorker(worker *Worker)
+	// GetWorker gets the worker of the task
+	GetWorker() *Worker
+	// AddSubtask adds a subtask to the current task
+	AddSubtask(subtask Task)
+	// GetSubtasks gets all subtasks of the current task
+	GetSubtasks() []Task
+	// GetParent gets the parent task of the current task
+	GetParent() Task
+	// SetParent sets the parent task of the current task
+	SetParent(parent Task)
+	// ExecuteSubtasks executes all subtasks and waits for them to complete
+	ExecuteSubtasks() error
+	// GetManager gets the manager of the current task
+	GetManager() IManager
+	// SetManager sets the manager of the current task
+	SetManager(manager IManager)
+	// GetSelf gets the self task of the current task
+	GetSelf() Task
+}
+
+type NamedTask interface {
+	GetName() string
+}
+
+type StatusTask interface {
+	GetStatus() string
 }
 
 type Info interface {
-	GetName() string
-	GetStatus() string
+	NamedTask
+	StatusTask
 }
 
 // Task is the interface for all tasks
@@ -54,4 +82,10 @@ type Task interface {
 type TaskWithInfo interface {
 	Task
 	Info
+}
+
+type IManager interface {
+	GenerateID() string
+	SaveSubTask(subtask Task)
+	GetByIDAll(id string) Task
 }
