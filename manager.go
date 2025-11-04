@@ -118,9 +118,7 @@ func (m *Manager[T]) next() {
 	m.logger.Debug("got task", slog.String("id", task.GetID()))
 	go func() {
 		defer func() {
-			if task.GetState() == StateWaitingRetry {
-				m.toRunTaskQueue.Push(task)
-			}
+			// Execute() handles all retries in the same worker, task is completed when it returns
 			m.workers.Put(worker)
 			m.next()
 		}()
