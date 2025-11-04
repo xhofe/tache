@@ -34,13 +34,6 @@ func (w Worker) Execute(task Task) {
 	}
 	// Retry immediately in the same worker until success or max retry exhausted
 	for {
-		if isRetry(task) {
-			task.SetState(StateBeforeRetry)
-			if hook, ok := Task(task).(OnBeforeRetry); ok {
-				hook.OnBeforeRetry()
-			}
-		}
-		
 		func() {
 			defer func() {
 				if err := recover(); err != nil {
@@ -48,23 +41,30 @@ func (w Worker) Execute(task Task) {
 					onError(NewErr(fmt.Sprintf("panic: %v", err)))
 				}
 			}()
-			
+
+			if isRetry(task) {
+				task.SetState(StateBeforeRetry)
+				if hook, ok := Task(task).(OnBeforeRetry); ok {
+					hook.OnBeforeRetry()
+				}
+			}
+
 			task.SetState(StateRunning)
 			err := task.Run()
 			if err != nil {
 				onError(err)
 				return
 			}
-			
+
 			task.SetState(StateSucceeded)
 			if onSucceeded, ok := Task(task).(OnSucceeded); ok {
 				onSucceeded.OnSucceeded()
 			}
 			task.SetErr(nil)
 		}()
-		
+
 		state := task.GetState()
-		if state == StateSucceeded || state == StateCanceled || state == StateFailed {
+		if state != StateWaitingRetry {
 			return
 		}
 	}
