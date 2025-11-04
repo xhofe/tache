@@ -17,28 +17,27 @@ type Worker struct {
 // Execute executes the task
 func (w Worker) Execute(task Task) {
 	task.SetWorker(&w)
+	onError := func(err error) {
+		task.SetErr(err)
+		if errors.Is(err, context.Canceled) {
+			task.SetState(StateCanceled)
+		} else {
+			task.SetState(StateErrored)
+		}
+		if !needRetry(task) {
+			if hook, ok := Task(task).(OnFailed); ok {
+				task.SetState(StateFailing)
+				hook.OnFailed()
+			}
+			task.SetState(StateFailed)
+		}
+	}
 	// Retry immediately in the same worker until success or max retry exhausted
 	for {
 		if isRetry(task) {
 			task.SetState(StateBeforeRetry)
 			if hook, ok := Task(task).(OnBeforeRetry); ok {
 				hook.OnBeforeRetry()
-			}
-		}
-		
-		onError := func(err error) {
-			task.SetErr(err)
-			if errors.Is(err, context.Canceled) {
-				task.SetState(StateCanceled)
-			} else {
-				task.SetState(StateErrored)
-			}
-			if !needRetry(task) {
-				if hook, ok := Task(task).(OnFailed); ok {
-					task.SetState(StateFailing)
-					hook.OnFailed()
-				}
-				task.SetState(StateFailed)
 			}
 		}
 		
